@@ -185,11 +185,17 @@ impl Scanner {
                 Ok(())
             }
             '"' => self.string(),
-            _ => Err(SyntaxError {
-                line: self.line,
-                loc: self.get_loc(),
-                message: format!("Unrecognized lexeme: {}", c),
-            }),
+            _ => {
+                if self.is_digit(c) {
+                    self.number()
+                } else {
+                    Err(SyntaxError {
+                        line: self.line,
+                        loc: self.get_loc(),
+                        message: format!("Unrecognized lexeme: {}", c),
+                    })
+                }
+            }
         }
     }
 
@@ -211,6 +217,10 @@ impl Scanner {
             }
             loc.push_str(&peek.to_string());
         }
+    }
+
+    fn is_digit(&self, c: char) -> bool {
+        return c.is_digit(10);
     }
 
     pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, ErrorStack> {
@@ -257,6 +267,14 @@ impl Scanner {
             '\0'
         } else {
             self.char_at(self.current.try_into().unwrap())
+        }
+    }
+
+    fn peek_next(&self) -> char {
+        if self.current + 1 >= self.source.len().try_into().unwrap() {
+            '\0'
+        } else {
+            self.char_at((self.current + 1).try_into().unwrap())
         }
     }
 
@@ -317,6 +335,45 @@ impl Scanner {
         self.advance();
         let string_value = self.substr(self.start + 1, self.current - 1);
         self.add_token(TokenType::STRING, Some(Literal::STRING(string_value)));
+        Ok(())
+    }
+
+    fn number(&mut self) -> Result<(), SyntaxError> {
+        loop {
+            let peek = self.peek();
+
+            if !self.is_digit(peek) {
+                break;
+            }
+
+            self.advance();
+        }
+
+        if self.peek() == '.' && self.is_digit(self.peek_next()) {
+            self.advance();
+            loop {
+                let peek = self.peek();
+
+                if !self.is_digit(peek) {
+                    break;
+                }
+
+                self.advance();
+            }
+        }
+        let num_string = self.substr(self.start, self.current);
+        let num_value = num_string.parse::<f64>();
+
+        if num_value.is_err() {
+            return Err(SyntaxError {
+                line: self.line,
+                loc: self.get_loc(),
+                message: String::from("Cannot parse number"),
+            });
+        }
+
+        let literal = Literal::NUMBER(num_value.unwrap());
+        self.add_token(TokenType::NUMBER, Some(literal));
         Ok(())
     }
 }
