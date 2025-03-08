@@ -2,11 +2,11 @@ use crate::error::{ErrorStack, SyntaxError};
 use std::{
     collections::HashMap,
     fmt::{self, Debug},
-    sync::Arc,
+    rc::Rc,
     vec,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 #[allow(dead_code)]
 pub enum TokenType {
     // Single-character tokens.
@@ -58,7 +58,7 @@ pub enum TokenType {
     EOF,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum Literal {
     IDENTIFIER(String),
@@ -69,11 +69,12 @@ pub enum Literal {
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct Token {
-    token_type: TokenType,
-    lexeme: String,
-    literal: Option<Literal>,
-    line: u32,
+    pub token_type: TokenType,
+    pub lexeme: String,
+    pub literal: Option<Literal>,
+    pub line: usize,
 }
 
 impl fmt::Display for Token {
@@ -90,9 +91,9 @@ impl fmt::Display for Token {
 pub struct Scanner {
     source: String,
     tokens: Vec<Token>,
-    start: u32,
-    current: u32,
-    line: u32,
+    start: usize,
+    current: usize,
+    line: usize,
     err_stack: ErrorStack,
     keywords: HashMap<String, TokenType>,
 }
@@ -243,7 +244,7 @@ impl Scanner {
         while !(self.is_at_end()) {
             self.start = self.current;
             self.scan_token()
-                .unwrap_or_else(|err| self.err_stack.stack.push(Arc::new(err)));
+                .unwrap_or_else(|err| self.err_stack.stack.push(Rc::new(err)));
         }
         if !self.err_stack.stack.is_empty() {
             return Err(self.err_stack.clone());
@@ -262,7 +263,7 @@ impl Scanner {
     }
 
     fn advance(&mut self) -> char {
-        let res = self.char_at(self.current.try_into().unwrap());
+        let res = self.char_at(self.current);
         self.current += 1;
         res
     }
@@ -271,7 +272,7 @@ impl Scanner {
         if self.is_at_end() {
             return false;
         }
-        if self.char_at(self.current.try_into().unwrap()) != expected {
+        if self.char_at(self.current) != expected {
             return false;
         }
         self.advance();
@@ -282,29 +283,24 @@ impl Scanner {
         if self.is_at_end() {
             '\0'
         } else {
-            self.char_at(self.current.try_into().unwrap())
+            self.char_at(self.current)
         }
     }
 
     fn peek_next(&self) -> char {
-        if self.current + 1 >= self.source.len().try_into().unwrap() {
+        if self.current + 1 >= self.source.len() {
             '\0'
         } else {
-            self.char_at((self.current + 1).try_into().unwrap())
+            self.char_at(self.current + 1)
         }
     }
 
     fn is_at_end(&self) -> bool {
-        self.current >= self.source.len().try_into().unwrap()
+        self.current >= self.source.len()
     }
 
-    fn substr(&self, start: u32, end: u32) -> String {
-        let collected: String = self
-            .source
-            .chars()
-            .skip(start.try_into().unwrap())
-            .take((end - start).try_into().unwrap())
-            .collect();
+    fn substr(&self, start: usize, end: usize) -> String {
+        let collected: String = self.source.chars().skip(start).take(end - start).collect();
         collected
     }
 
@@ -312,8 +308,8 @@ impl Scanner {
         let lexeme = self.substr(self.start, self.current);
         match literal {
             None => self.tokens.push(Token {
-                token_type: token_type,
-                lexeme: lexeme,
+                token_type,
+                lexeme,
                 literal: None,
                 line: self.line,
             }),

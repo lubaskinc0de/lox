@@ -5,8 +5,10 @@ use std::{
 };
 
 use error::ErrorStack;
+use parser::Parser;
 use scanner::Scanner;
 mod error;
+mod parser;
 mod scanner;
 
 fn read_file_to_string(file_name: &str) -> String {
@@ -26,9 +28,14 @@ fn run_file(file_name: &str) {
 fn run(line: &str) -> Result<(), ErrorStack> {
     let mut scanner = Scanner::new(line);
     let tokens = scanner.scan_tokens()?;
+
     for token in tokens {
         println!("{}", token)
     }
+    let mut parser = Parser::new(tokens.to_vec());
+    let expr = parser.parse()?;
+
+    println!("{:?}", expr);
     Ok(())
 }
 
