@@ -164,6 +164,26 @@ impl Scanner {
                     None,
                 ))
             }
+            '/' => {
+                let is_equal = self.match_next('/');
+
+                if !is_equal {
+                    Ok(self.add_token(TokenType::SLASH, None))
+                } else {
+                    Ok(loop {
+                        let peek = self.peek();
+                        if peek == '\n' || peek == '\0' {
+                            break;
+                        }
+                        self.advance();
+                    })
+                }
+            }
+            ' ' | '\r' | '\t' => Ok(()),
+            '\n' => {
+                self.line += 1;
+                Ok(())
+            }
             _ => Err(SyntaxError {
                 line: self.line,
                 loc: self.current,
@@ -209,6 +229,14 @@ impl Scanner {
         }
         self.advance();
         return true;
+    }
+
+    fn peek(&self) -> char {
+        if self.is_at_end() {
+            '\0'
+        } else {
+            self.char_at(self.current.try_into().unwrap())
+        }
     }
 
     fn is_at_end(&self) -> bool {
