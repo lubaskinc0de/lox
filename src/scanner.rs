@@ -1,11 +1,12 @@
 use crate::error::{ErrorStack, SyntaxError};
 use std::{
+    collections::HashMap,
     fmt::{self, Debug},
     sync::Arc,
     vec,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum TokenType {
     // Single-character tokens.
@@ -93,6 +94,7 @@ pub struct Scanner {
     current: u32,
     line: u32,
     err_stack: ErrorStack,
+    keywords: HashMap<String, TokenType>,
 }
 
 impl Scanner {
@@ -104,6 +106,24 @@ impl Scanner {
             current: 0,
             line: 1,
             err_stack: ErrorStack { stack: vec![] },
+            keywords: HashMap::from([
+                (String::from("and"), TokenType::AND),
+                (String::from("class"), TokenType::CLASS),
+                (String::from("else"), TokenType::ELSE),
+                (String::from("false"), TokenType::FALSE),
+                (String::from("for"), TokenType::FOR),
+                (String::from("fun"), TokenType::FUN),
+                (String::from("if"), TokenType::IF),
+                (String::from("nil"), TokenType::NIL),
+                (String::from("or"), TokenType::OR),
+                (String::from("print"), TokenType::PRINT),
+                (String::from("return"), TokenType::RETURN),
+                (String::from("super"), TokenType::SUPER),
+                (String::from("this"), TokenType::THIS),
+                (String::from("true"), TokenType::TRUE),
+                (String::from("var"), TokenType::VAR),
+                (String::from("while"), TokenType::WHILE),
+            ]),
         }
     }
 
@@ -385,7 +405,11 @@ impl Scanner {
         }
 
         let identifier_value = self.substr(self.start, self.current);
-        let identifier_literal = Literal::IDENTIFIER(identifier_value);
-        self.add_token(TokenType::IDENTIFIER, Some(identifier_literal));
+        let identifier_literal = Literal::IDENTIFIER(identifier_value.clone());
+
+        match self.keywords.get(&identifier_value) {
+            Some(val) => self.add_token(val.clone(), Some(identifier_literal)),
+            None => self.add_token(TokenType::IDENTIFIER, Some(identifier_literal)),
+        }
     }
 }
