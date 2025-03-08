@@ -184,11 +184,29 @@ impl Scanner {
                 self.line += 1;
                 Ok(())
             }
-            _ => Err(SyntaxError {
-                line: self.line,
-                loc: self.current,
-                message: format!("Unrecognized lexeme: {}", c),
-            }),
+            _ => {
+                let initial_current = self.current;
+                let mut loc = String::new();
+                Err(SyntaxError {
+                    line: self.line,
+                    loc: loop {
+                        self.current -= 1;
+
+                        let peek = self.peek();
+                        if peek == '\n' || peek == '\0' || self.current == 0 {
+                            if self.current == 0 {
+                                loc.push_str(&peek.to_string());
+                            }
+                            self.current = initial_current;
+                            let mut formatted = loc.chars().rev().collect::<String>();
+                            formatted.push_str(" <- This symbol");
+                            break formatted;
+                        }
+                        loc.push_str(&peek.to_string());
+                    },
+                    message: format!("Unrecognized lexeme: {}", c),
+                })
+            }
         }
     }
 
