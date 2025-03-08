@@ -1,9 +1,9 @@
 use std::{
-    env,
     fs::File,
     io::{self, Read},
 };
 
+use clap::Parser as CliParser;
 use error::ErrorStack;
 use parser::Parser;
 use scanner::Scanner;
@@ -35,7 +35,7 @@ fn run(line: &str) -> Result<(), ErrorStack> {
     let mut parser = Parser::new(tokens.to_vec());
     let expr = parser.parse()?;
 
-    println!("{:?}", expr);
+    println!("Expression: {:#?}", expr);
     Ok(())
 }
 
@@ -71,12 +71,29 @@ fn run_prompt() {
     }
 }
 
+#[derive(CliParser, Debug)]
+#[command(
+    version,
+    about = "RLox language",
+    long_about = "lubaskinc0de's Lox language implementation on Rust"
+)]
+struct CliArgs {
+    #[arg(short, long, default_value_t = true)]
+    repl: bool,
+    file_name: Option<String>,
+}
+
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let file_name = args.get(1);
+    let cli = CliArgs::parse();
+    let file_name = cli.file_name;
+
+    if cli.repl {
+        run_prompt();
+        return;
+    }
 
     match file_name {
-        Some(f_name) => run_file(f_name),
-        None => run_prompt(),
+        Some(f_name) => run_file(&f_name),
+        None => panic!("Error: You must provide file name."),
     }
 }

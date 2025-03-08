@@ -79,11 +79,17 @@ pub struct Token {
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Type: {:?} | Lexeme: {} | Literal: {:?}",
-            self.token_type, self.lexeme, self.literal
-        )
+        if self.literal.is_some() {
+            write!(
+                f,
+                "[Token {:?}] Lexeme: '{}' -- {:?}",
+                self.token_type,
+                self.lexeme,
+                self.literal.clone().unwrap()
+            )
+        } else {
+            write!(f, "[Token {:?}] Lexeme: '{}'", self.token_type, self.lexeme)
+        }
     }
 }
 
