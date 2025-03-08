@@ -185,17 +185,13 @@ impl Scanner {
                 Ok(())
             }
             '"' => self.string(),
-            _ => {
-                if self.is_digit(c) {
-                    self.number()
-                } else {
-                    Err(SyntaxError {
-                        line: self.line,
-                        loc: self.get_loc(),
-                        message: format!("Unrecognized lexeme: {}", c),
-                    })
-                }
-            }
+            val if self.is_digit(val) => self.number(),
+            val if val.is_alphabetic() => Ok(self.identifier()),
+            _ => Err(SyntaxError {
+                line: self.line,
+                loc: self.get_loc(),
+                message: format!("Unrecognized lexeme: {}", c),
+            }),
         }
     }
 
@@ -375,5 +371,21 @@ impl Scanner {
         let literal = Literal::NUMBER(num_value.unwrap());
         self.add_token(TokenType::NUMBER, Some(literal));
         Ok(())
+    }
+
+    fn identifier(&mut self) {
+        loop {
+            let peek = self.peek();
+
+            if !peek.is_alphabetic() {
+                break;
+            }
+
+            self.advance();
+        }
+
+        let identifier_value = self.substr(self.start, self.current);
+        let identifier_literal = Literal::IDENTIFIER(identifier_value);
+        self.add_token(TokenType::IDENTIFIER, Some(identifier_literal));
     }
 }
