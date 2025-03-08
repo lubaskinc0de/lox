@@ -184,29 +184,32 @@ impl Scanner {
                 self.line += 1;
                 Ok(())
             }
-            _ => {
-                let initial_current = self.current;
-                let mut loc = String::new();
-                Err(SyntaxError {
-                    line: self.line,
-                    loc: loop {
-                        self.current -= 1;
+            '"' => self.string(),
+            _ => Err(SyntaxError {
+                line: self.line,
+                loc: self.get_loc(),
+                message: format!("Unrecognized lexeme: {}", c),
+            }),
+        }
+    }
 
-                        let peek = self.peek();
-                        if peek == '\n' || peek == '\0' || self.current == 0 {
-                            if self.current == 0 {
-                                loc.push_str(&peek.to_string());
-                            }
-                            self.current = initial_current;
-                            let mut formatted = loc.chars().rev().collect::<String>();
-                            formatted.push_str(" <- This symbol");
-                            break formatted;
-                        }
-                        loc.push_str(&peek.to_string());
-                    },
-                    message: format!("Unrecognized lexeme: {}", c),
-                })
+    fn get_loc(&mut self) -> String {
+        let initial_current = self.current;
+        let mut loc = String::new();
+        loop {
+            self.current -= 1;
+
+            let peek = self.peek();
+            if peek == '\n' || peek == '\0' || self.current == 0 {
+                if self.current == 0 {
+                    loc.push_str(&peek.to_string());
+                }
+                self.current = initial_current;
+                let mut formatted = loc.chars().rev().collect::<String>();
+                formatted.push_str(" <- This symbol");
+                break formatted;
             }
+            loc.push_str(&peek.to_string());
         }
     }
 
@@ -287,5 +290,33 @@ impl Scanner {
                 line: self.line,
             }),
         }
+    }
+
+    fn string(&mut self) -> Result<(), SyntaxError> {
+        loop {
+            let peek = self.peek();
+
+            if peek == '"' || peek == '\0' {
+                break;
+            }
+
+            if peek == '\n' {
+                self.line += 1;
+            }
+
+            self.advance();
+        }
+
+        if self.is_at_end() {
+            return Err(SyntaxError {
+                line: self.line,
+                loc: self.get_loc(),
+                message: String::from("Unclosed string literal"),
+            });
+        }
+        self.advance();
+        let string_value = self.substr(self.start + 1, self.current - 1);
+        self.add_token(TokenType::STRING, Some(Literal::STRING(string_value)));
+        Ok(())
     }
 }
