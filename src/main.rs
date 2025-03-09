@@ -3,8 +3,8 @@ use std::{
     io::{self, Read},
 };
 
+use crate::error::InterpreterError;
 use clap::Parser as CliParser;
-use error::ErrorStack;
 use interpreter::Interpreter;
 use parser::Parser;
 use scanner::Scanner;
@@ -28,7 +28,7 @@ fn run_file(file_name: &str) {
     execute_panic(&source);
 }
 
-fn run(line: &str) -> Result<(), ErrorStack> {
+fn run(line: &str) -> Result<(), InterpreterError> {
     let mut scanner = Scanner::new(line);
     let interpreter = Interpreter {};
     let tokens = scanner.scan_tokens()?;
@@ -39,7 +39,7 @@ fn run(line: &str) -> Result<(), ErrorStack> {
     let mut parser = Parser::new(tokens.to_vec());
     let expr = parser.parse()?;
 
-    let evaluated = interpreter.interpret(expr);
+    let evaluated = interpreter.interpret(expr)?;
     println!("Evaluated: {:#?}", evaluated);
     Ok(())
 }

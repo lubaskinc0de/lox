@@ -1,66 +1,32 @@
-use std::{error::Error, fmt, rc::Rc};
+use std::rc::Rc;
+use thiserror::Error;
 
 use crate::scanner::Token;
 
-#[allow(dead_code)]
-pub trait InterpreterError: Error + fmt::Debug + fmt::Display {}
+#[derive(Debug, Error)]
+pub enum InterpreterError {
+    #[error("While scanning: {message}; line: {line}\n Occurred here: {loc}")]
+    SyntaxError {
+        line: usize,
+        loc: String,
+        message: String,
+    },
 
-#[derive(Debug)]
-pub struct SyntaxError {
-    pub line: usize,
-    pub loc: String,
-    pub message: String,
-}
+    #[error("While parsing: {message}\n Token: {token}; Line: {line}")]
+    ParserError {
+        message: String,
+        token: Token,
+        line: usize,
+    },
 
-impl InterpreterError for SyntaxError {}
-impl Error for SyntaxError {}
+    #[error("Runtime: {message}\n Token: {token:?}; Line: {line}; Hint: {hint}")]
+    RuntimeError {
+        message: String,
+        token: Option<Token>,
+        line: usize,
+        hint: String,
+    },
 
-impl fmt::Display for SyntaxError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}; line: {}\n Occured here: {}",
-            self.message, self.line, self.loc
-        )
-    }
-}
-
-#[derive(Debug)]
-pub struct ParserError {
-    pub message: String,
-    pub token: Token,
-}
-
-impl InterpreterError for ParserError {}
-impl Error for ParserError {}
-
-impl fmt::Display for ParserError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}\n Token: {}; Line: {}",
-            self.message, self.token, self.token.line
-        )
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ErrorStack {
-    pub stack: Vec<Rc<dyn InterpreterError>>,
-}
-
-impl InterpreterError for ErrorStack {}
-impl Error for ErrorStack {}
-impl ErrorStack {
-    pub fn new(errors: Vec<Rc<dyn InterpreterError>>) -> Self {
-        Self { stack: errors }
-    }
-}
-impl fmt::Display for ErrorStack {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for err in &self.stack {
-            writeln!(f, "Error: {}", err).unwrap()
-        }
-        Ok(())
-    }
+    #[error("Multiple errors occurred:\n{}", .stack.iter().map(|err| format!("{}", err)).collect::<Vec<_>>().join("\n"))]
+    ErrorStack { stack: Vec<Rc<InterpreterError>> },
 }

@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::{
-    error::{ErrorStack, ParserError},
+    error::InterpreterError,
     scanner::{Literal, Token, TokenType},
 };
 
@@ -34,16 +34,18 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Expr, ErrorStack> {
+    pub fn parse(&mut self) -> Result<Expr, InterpreterError> {
         self.expression()
-            .or_else(|err| Err(ErrorStack::new(vec![Rc::new(err)])))
+            .map_err(|err| InterpreterError::ErrorStack {
+                stack: vec![Rc::new(err)],
+            })
     }
 
-    fn expression(&mut self) -> Result<Expr, ParserError> {
+    fn expression(&mut self) -> Result<Expr, InterpreterError> {
         self.equality()
     }
 
-    fn equality(&mut self) -> Result<Expr, ParserError> {
+    fn equality(&mut self) -> Result<Expr, InterpreterError> {
         let mut expr = self.comparison()?;
 
         while self.matches(&[TokenType::EqualEqual, TokenType::BangEqual]) {
@@ -58,7 +60,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> Result<Expr, ParserError> {
+    fn comparison(&mut self) -> Result<Expr, InterpreterError> {
         let mut expr = self.term()?;
         while self.matches(&[
             TokenType::LESS,
@@ -77,7 +79,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn term(&mut self) -> Result<Expr, ParserError> {
+    fn term(&mut self) -> Result<Expr, InterpreterError> {
         let mut expr = self.factor()?;
         while self.matches(&[TokenType::MINUS, TokenType::PLUS]) {
             let op = self.prev().clone();
@@ -91,7 +93,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn factor(&mut self) -> Result<Expr, ParserError> {
+    fn factor(&mut self) -> Result<Expr, InterpreterError> {
         let mut expr = self.unary()?;
         while self.matches(&[TokenType::STAR, TokenType::SLASH]) {
             let op = self.prev().clone();
@@ -105,7 +107,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn unary(&mut self) -> Result<Expr, ParserError> {
+    fn unary(&mut self) -> Result<Expr, InterpreterError> {
         if self.matches(&[TokenType::BANG, TokenType::MINUS]) {
             let op = self.prev().clone();
             let right = self.unary()?;
@@ -117,7 +119,7 @@ impl Parser {
         self.primary()
     }
 
-    fn primary(&mut self) -> Result<Expr, ParserError> {
+    fn primary(&mut self) -> Result<Expr, InterpreterError> {
         if self.matches(&[TokenType::FALSE]) {
             return Ok(Expr::Literal(Literal::BOOL(false)));
         }
@@ -141,17 +143,19 @@ impl Parser {
             let consumed = self.consume(TokenType::RightParen);
 
             if consumed.is_none() {
-                return Err(ParserError {
+                return Err(InterpreterError::ParserError {
                     message: String::from("Expect ')' after expression."),
                     token: self.peek().clone(),
+                    line: self.peek().line,
                 });
             }
             return Ok(Expr::Grouping(Box::new(expr)));
         }
 
-        Err(ParserError {
+        Err(InterpreterError::ParserError {
             message: String::from("Expected expression"),
             token: self.peek().clone(),
+            line: self.peek().line,
         })
     }
 

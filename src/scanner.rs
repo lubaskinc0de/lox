@@ -1,4 +1,4 @@
-use crate::error::{ErrorStack, SyntaxError};
+use crate::error::InterpreterError;
 use std::{
     collections::HashMap,
     fmt::{self, Debug},
@@ -113,7 +113,7 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
-    err_stack: ErrorStack,
+    err_stack: Vec<Rc<InterpreterError>>,
     keywords: HashMap<String, TokenType>,
 }
 
@@ -125,7 +125,7 @@ impl Scanner {
             start: 0,
             current: 0,
             line: 1,
-            err_stack: ErrorStack { stack: vec![] },
+            err_stack: vec![],
             keywords: HashMap::from([
                 (String::from("and"), TokenType::AND),
                 (String::from("class"), TokenType::CLASS),
@@ -147,7 +147,7 @@ impl Scanner {
         }
     }
 
-    fn scan_token(&mut self) -> Result<(), SyntaxError> {
+    fn scan_token(&mut self) -> Result<(), InterpreterError> {
         let c = self.advance();
         match c {
             '(' => Ok(self.add_token(TokenType::LeftParen, None)),
@@ -227,7 +227,7 @@ impl Scanner {
             '"' => self.string(),
             val if self.is_digit(val) => self.number(),
             val if val.is_alphabetic() => Ok(self.identifier()),
-            _ => Err(SyntaxError {
+            _ => Err(InterpreterError::SyntaxError {
                 line: self.line,
                 loc: self.get_loc(),
                 message: format!("Unrecognized lexeme: {}", c),
@@ -259,14 +259,16 @@ impl Scanner {
         return c.is_digit(10);
     }
 
-    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, ErrorStack> {
+    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, InterpreterError> {
         while !(self.is_at_end()) {
             self.start = self.current;
             self.scan_token()
-                .unwrap_or_else(|err| self.err_stack.stack.push(Rc::new(err)));
+                .unwrap_or_else(|err| self.err_stack.push(Rc::new(err)));
         }
-        if !self.err_stack.stack.is_empty() {
-            return Err(self.err_stack.clone());
+        if !self.err_stack.is_empty() {
+            return Err(InterpreterError::ErrorStack {
+                stack: self.err_stack.clone(),
+            });
         }
         self.tokens.push(Token {
             token_type: TokenType::EOF,
@@ -341,7 +343,7 @@ impl Scanner {
         }
     }
 
-    fn string(&mut self) -> Result<(), SyntaxError> {
+    fn string(&mut self) -> Result<(), InterpreterError> {
         loop {
             let peek = self.peek();
 
@@ -357,7 +359,7 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            return Err(SyntaxError {
+            return Err(InterpreterError::SyntaxError {
                 line: self.line,
                 loc: self.get_loc(),
                 message: String::from("Unclosed string literal"),
@@ -369,7 +371,7 @@ impl Scanner {
         Ok(())
     }
 
-    fn number(&mut self) -> Result<(), SyntaxError> {
+    fn number(&mut self) -> Result<(), InterpreterError> {
         loop {
             let peek = self.peek();
 
@@ -396,7 +398,7 @@ impl Scanner {
         let num_value = num_string.parse::<f64>();
 
         if num_value.is_err() {
-            return Err(SyntaxError {
+            return Err(InterpreterError::SyntaxError {
                 line: self.line,
                 loc: self.get_loc(),
                 message: String::from("Cannot parse number"),
