@@ -38,6 +38,7 @@ fn run(line: &str) -> Result<(), ErrorStack> {
     }
     let mut parser = Parser::new(tokens.to_vec());
     let expr = parser.parse()?;
+
     let evaluated = interpreter.interpret(expr);
     println!("Evaluated: {:#?}", evaluated);
     Ok(())

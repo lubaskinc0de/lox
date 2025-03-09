@@ -111,8 +111,7 @@ impl Expr {
                             Literal::NUMBER(val) => left_val = val,
                             _ => panic!("Not a number"),
                         }
-
-                        Literal::BOOL(right_val < left_val)
+                        Literal::BOOL(right_val > left_val)
                     }
                     TokenType::GREATER => {
                         let right_val;
@@ -126,7 +125,7 @@ impl Expr {
                             _ => panic!("Not a number"),
                         }
 
-                        Literal::BOOL(right_val > left_val)
+                        Literal::BOOL(right_val < left_val)
                     }
                     TokenType::LessEqual => {
                         let right_val;
@@ -140,7 +139,7 @@ impl Expr {
                             _ => panic!("Not a number"),
                         }
 
-                        Literal::BOOL(right_val <= left_val)
+                        Literal::BOOL(right_val >= left_val)
                     }
                     TokenType::GreaterEqual => {
                         let right_val;
@@ -154,7 +153,7 @@ impl Expr {
                             _ => panic!("Not a number"),
                         }
 
-                        Literal::BOOL(right_val >= left_val)
+                        Literal::BOOL(right_val <= left_val)
                     }
                     TokenType::BangEqual => match (&right_eval, &left_eval) {
                         (Literal::NUMBER(right_val), Literal::NUMBER(left_val)) => {
@@ -212,7 +211,7 @@ impl Parser {
     fn equality(&mut self) -> Result<Expr, ParserError> {
         let mut expr = self.comparison()?;
 
-        while self.matches(&[TokenType::EQUAL, TokenType::BangEqual]) {
+        while self.matches(&[TokenType::EqualEqual, TokenType::BangEqual]) {
             let op = self.prev().clone();
             let right = self.comparison()?;
             expr = Expr::Binary {
