@@ -68,6 +68,19 @@ pub enum Literal {
     NIL,
 }
 
+impl Literal {
+    pub fn is_truthy(&self) -> bool {
+        match &self {
+            Literal::BOOL(val) => match val {
+                true => true,
+                false => false,
+            },
+            Literal::NIL => false,
+            _ => true,
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Token {

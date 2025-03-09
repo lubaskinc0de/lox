@@ -5,9 +5,11 @@ use std::{
 
 use clap::Parser as CliParser;
 use error::ErrorStack;
+use interpreter::Interpreter;
 use parser::Parser;
 use scanner::Scanner;
 mod error;
+mod interpreter;
 mod parser;
 mod scanner;
 
@@ -17,6 +19,7 @@ fn read_file_to_string(file_name: &str) -> String {
         .expect("File not found")
         .read_to_string(&mut buf)
         .unwrap();
+    println!("{}", buf);
     buf
 }
 
@@ -27,6 +30,7 @@ fn run_file(file_name: &str) {
 
 fn run(line: &str) -> Result<(), ErrorStack> {
     let mut scanner = Scanner::new(line);
+    let interpreter = Interpreter {};
     let tokens = scanner.scan_tokens()?;
 
     for token in tokens {
@@ -34,8 +38,8 @@ fn run(line: &str) -> Result<(), ErrorStack> {
     }
     let mut parser = Parser::new(tokens.to_vec());
     let expr = parser.parse()?;
-
-    println!("Expression: {:#?}", expr);
+    let evaluated = interpreter.interpret(expr);
+    println!("Evaluated: {:#?}", evaluated);
     Ok(())
 }
 
@@ -87,7 +91,7 @@ fn main() {
     let cli = CliArgs::parse();
     let file_name = cli.file_name;
 
-    if cli.repl {
+    if cli.repl && file_name.is_none() {
         run_prompt();
         return;
     }

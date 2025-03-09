@@ -1,3 +1,4 @@
+use core::panic;
 use std::rc::Rc;
 
 use crate::{
@@ -14,11 +15,176 @@ pub enum Expr {
         right: Box<Expr>,
     },
     Unary {
-        token: Box<Expr>,
+        right: Box<Expr>,
         op: Token,
     },
     Literal(Literal),
     Grouping(Box<Expr>),
+}
+
+impl Expr {
+    pub fn evaluate(&self) -> Literal {
+        match &self {
+            Expr::Literal(val) => val.clone(),
+            Expr::Grouping(expr) => expr.evaluate(),
+            Expr::Unary { right, op } => {
+                let evaluated = right.evaluate();
+
+                match op.token_type {
+                    TokenType::MINUS => match evaluated {
+                        Literal::NUMBER(number) => Literal::NUMBER(-number),
+                        _ => panic!("Cannot apply minus to non-number"),
+                    },
+                    TokenType::BANG => Literal::BOOL(!evaluated.is_truthy()),
+                    _ => panic!("Unhandled operator"),
+                }
+            }
+            Expr::Binary { left, op, right } => {
+                let right_eval = right.evaluate();
+                let left_eval = left.evaluate();
+
+                match op.token_type {
+                    TokenType::MINUS => {
+                        let right_val;
+                        match right_eval {
+                            Literal::NUMBER(val) => right_val = val,
+                            _ => panic!("Not a number"),
+                        }
+                        let left_val;
+                        match left_eval {
+                            Literal::NUMBER(val) => left_val = val,
+                            _ => panic!("Not a number"),
+                        }
+
+                        Literal::NUMBER(right_val - left_val)
+                    }
+                    TokenType::PLUS => {
+                        let right_val;
+                        match right_eval {
+                            Literal::NUMBER(val) => right_val = val,
+                            _ => panic!("Not a number"),
+                        }
+                        let left_val;
+                        match left_eval {
+                            Literal::NUMBER(val) => left_val = val,
+                            _ => panic!("Not a number"),
+                        }
+
+                        Literal::NUMBER(right_val + left_val)
+                    }
+                    TokenType::STAR => {
+                        let right_val;
+                        match right_eval {
+                            Literal::NUMBER(val) => right_val = val,
+                            _ => panic!("Not a number"),
+                        }
+                        let left_val;
+                        match left_eval {
+                            Literal::NUMBER(val) => left_val = val,
+                            _ => panic!("Not a number"),
+                        }
+
+                        Literal::NUMBER(right_val * left_val)
+                    }
+                    TokenType::SLASH => {
+                        let right_val;
+                        match right_eval {
+                            Literal::NUMBER(val) => right_val = val,
+                            _ => panic!("Not a number"),
+                        }
+                        let left_val;
+                        match left_eval {
+                            Literal::NUMBER(val) => left_val = val,
+                            _ => panic!("Not a number"),
+                        }
+
+                        Literal::NUMBER(right_val / left_val)
+                    }
+                    TokenType::LESS => {
+                        let right_val;
+                        match right_eval {
+                            Literal::NUMBER(val) => right_val = val,
+                            _ => panic!("Not a number"),
+                        }
+                        let left_val;
+                        match left_eval {
+                            Literal::NUMBER(val) => left_val = val,
+                            _ => panic!("Not a number"),
+                        }
+
+                        Literal::BOOL(right_val < left_val)
+                    }
+                    TokenType::GREATER => {
+                        let right_val;
+                        match right_eval {
+                            Literal::NUMBER(val) => right_val = val,
+                            _ => panic!("Not a number"),
+                        }
+                        let left_val;
+                        match left_eval {
+                            Literal::NUMBER(val) => left_val = val,
+                            _ => panic!("Not a number"),
+                        }
+
+                        Literal::BOOL(right_val > left_val)
+                    }
+                    TokenType::LessEqual => {
+                        let right_val;
+                        match right_eval {
+                            Literal::NUMBER(val) => right_val = val,
+                            _ => panic!("Not a number"),
+                        }
+                        let left_val;
+                        match left_eval {
+                            Literal::NUMBER(val) => left_val = val,
+                            _ => panic!("Not a number"),
+                        }
+
+                        Literal::BOOL(right_val <= left_val)
+                    }
+                    TokenType::GreaterEqual => {
+                        let right_val;
+                        match right_eval {
+                            Literal::NUMBER(val) => right_val = val,
+                            _ => panic!("Not a number"),
+                        }
+                        let left_val;
+                        match left_eval {
+                            Literal::NUMBER(val) => left_val = val,
+                            _ => panic!("Not a number"),
+                        }
+
+                        Literal::BOOL(right_val >= left_val)
+                    }
+                    TokenType::BangEqual => match (&right_eval, &left_eval) {
+                        (Literal::NUMBER(right_val), Literal::NUMBER(left_val)) => {
+                            Literal::BOOL(right_val != left_val)
+                        }
+                        (Literal::STRING(right_val), Literal::STRING(left_val)) => {
+                            Literal::BOOL(right_val != left_val)
+                        }
+                        (Literal::BOOL(right_val), Literal::BOOL(left_val)) => {
+                            Literal::BOOL(right_val != left_val)
+                        }
+                        _ => panic!("Unsupported literal type for comparison"),
+                    },
+                    TokenType::EqualEqual => match (&right_eval, &left_eval) {
+                        (Literal::NUMBER(right_val), Literal::NUMBER(left_val)) => {
+                            Literal::BOOL(right_val == left_val)
+                        }
+                        (Literal::STRING(right_val), Literal::STRING(left_val)) => {
+                            Literal::BOOL(right_val == left_val)
+                        }
+                        (Literal::BOOL(right_val), Literal::BOOL(left_val)) => {
+                            Literal::BOOL(right_val == left_val)
+                        }
+                        _ => panic!("Unsupported literal type for comparison"),
+                    },
+                    _ => panic!("Unsupported operator"),
+                }
+            }
+        }
+    }
 }
 
 pub struct Parser {
@@ -110,7 +276,7 @@ impl Parser {
             let op = self.prev().clone();
             let right = self.unary()?;
             return Ok(Expr::Unary {
-                token: Box::new(right),
+                right: Box::new(right),
                 op,
             });
         }
@@ -129,6 +295,10 @@ impl Parser {
         }
 
         if self.matches(&[TokenType::NUMBER, TokenType::STRING]) {
+            return Ok(Expr::Literal(self.prev().literal.clone().unwrap()));
+        }
+
+        if self.matches(&[TokenType::IDENTIFIER]) {
             return Ok(Expr::Literal(self.prev().literal.clone().unwrap()));
         }
 
