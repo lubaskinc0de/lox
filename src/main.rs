@@ -12,6 +12,7 @@ mod error;
 mod interpreter;
 mod parser;
 mod scanner;
+mod stmt;
 
 fn read_file_to_string(file_name: &str) -> String {
     let mut buf = String::new();
@@ -33,14 +34,10 @@ fn run(line: &str) -> Result<(), InterpreterError> {
     let interpreter = Interpreter {};
     let tokens = scanner.scan_tokens()?;
 
-    for token in tokens {
-        println!("{}", token)
-    }
     let mut parser = Parser::new(tokens.to_vec());
-    let expr = parser.parse()?;
+    let statements = parser.parse()?;
 
-    let evaluated = interpreter.interpret(expr)?;
-    println!("Evaluated: {:#?}", evaluated);
+    interpreter.interpret(&statements)?;
     Ok(())
 }
 

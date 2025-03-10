@@ -2,22 +2,47 @@ use crate::{
     error::InterpreterError,
     parser::Expr,
     scanner::{Literal, TokenType},
+    stmt::Stmt,
 };
 
 pub struct Interpreter {}
 
 impl Interpreter {
-    pub fn interpret(&self, expr: Expr) -> Result<Literal, InterpreterError> {
+    pub fn interpret(&self, program: &[Stmt]) -> Result<(), InterpreterError> {
+        Ok(for stmt in program {
+            self.execute(stmt)?;
+        })
+    }
+    fn execute(&self, stmt: &Stmt) -> Result<(), InterpreterError> {
+        match stmt {
+            Stmt::Expression(expr) => self.evaluate(expr).map(|_| {}),
+            Stmt::Print(expr) => {
+                let evaluated = self.evaluate(expr)?;
+                Ok(self.execute_print(evaluated))
+            }
+        }?;
+        Ok(())
+    }
+    fn execute_print(&self, val: Literal) {
+        match val {
+            Literal::IDENTIFIER(val) => println!("{}", val),
+            Literal::STRING(val) => println!("{}", val),
+            Literal::NUMBER(val) => println!("{}", val),
+            Literal::BOOL(val) => println!("{}", val),
+            Literal::NIL => println!("nil"),
+        }
+    }
+    fn evaluate(&self, expr: &Expr) -> Result<Literal, InterpreterError> {
         match expr {
             Expr::Literal(val) => Ok(val.clone()),
-            Expr::Grouping(expr) => self.interpret(*expr),
+            Expr::Grouping(expr) => self.evaluate(&expr),
             Expr::Unary { right, op } => {
-                let evaluated = self.interpret(*right)?;
+                let evaluated = self.evaluate(&right)?;
                 self.evaluate_unary(&op.token_type, evaluated, op.line)
             }
             Expr::Binary { left, op, right } => {
-                let right_eval = self.interpret(*right)?;
-                let left_eval = self.interpret(*left)?;
+                let right_eval = self.evaluate(&right)?;
+                let left_eval = self.evaluate(&left)?;
 
                 match op.token_type {
                     TokenType::MINUS | TokenType::PLUS | TokenType::STAR | TokenType::SLASH => {

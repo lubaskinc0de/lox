@@ -3,6 +3,7 @@ use std::rc::Rc;
 use crate::{
     error::InterpreterError,
     scanner::{Literal, Token, TokenType},
+    stmt::Stmt,
 };
 
 #[derive(Debug)]
@@ -28,17 +29,59 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
+        if tokens.is_empty() {
+            panic!("Cannot initialize parser with empty tokens")
+        }
         Self {
             tokens: tokens,
             current: 0,
         }
     }
 
-    pub fn parse(&mut self) -> Result<Expr, InterpreterError> {
-        self.expression()
-            .map_err(|err| InterpreterError::ErrorStack {
-                stack: vec![Rc::new(err)],
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, InterpreterError> {
+        let mut stmts: Vec<Stmt> = vec![];
+        while !self.is_at_end() {
+            stmts.push(
+                self.statement()
+                    .map_err(|err| InterpreterError::ErrorStack {
+                        stack: vec![Rc::new(err)],
+                    })?,
+            );
+        }
+        Ok(stmts)
+    }
+
+    fn statement(&mut self) -> Result<Stmt, InterpreterError> {
+        if self.matches(&[TokenType::PRINT]) {
+            return self.print_stmt();
+        }
+
+        self.expression_stmt()
+    }
+
+    fn expect_semicolon(&mut self) -> Result<&Token, InterpreterError> {
+        let token = self.peek();
+        let token_clone = token.clone();
+        let line = token.line;
+
+        self.consume(TokenType::SEMICOLON)
+            .ok_or(InterpreterError::ParserError {
+                message: "Expected ';' after expression".to_string(),
+                token: token_clone,
+                line,
             })
+    }
+
+    fn print_stmt(&mut self) -> Result<Stmt, InterpreterError> {
+        let expr = self.expression()?;
+        self.expect_semicolon()?;
+        Ok(Stmt::Print(expr))
+    }
+
+    fn expression_stmt(&mut self) -> Result<Stmt, InterpreterError> {
+        let expr = self.expression()?;
+        self.expect_semicolon()?;
+        return Ok(Stmt::Expression(expr));
     }
 
     fn expression(&mut self) -> Result<Expr, InterpreterError> {
@@ -160,7 +203,9 @@ impl Parser {
     }
 
     fn peek(&self) -> &Token {
-        self.tokens.get(self.current).unwrap()
+        self.tokens
+            .get(self.current)
+            .unwrap_or_else(|| self.tokens.get(0).unwrap())
     }
 
     fn prev(&self) -> &Token {
