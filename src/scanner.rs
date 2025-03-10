@@ -6,7 +6,7 @@ use std::{
     vec,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Hash)]
 #[allow(dead_code)]
 pub enum TokenType {
     // Single-character tokens.
@@ -31,6 +31,7 @@ pub enum TokenType {
     GreaterEqual,
     LESS,
     LessEqual,
+    Pow,
 
     // Literals.
     IDENTIFIER,
@@ -106,6 +107,32 @@ impl fmt::Display for Token {
     }
 }
 
+impl Token {
+    pub fn literal(&self) -> Result<Literal, InterpreterError> {
+        let line = self.line;
+        match &self.literal {
+            Some(literal) => Ok(literal.clone()),
+            None => Err(InterpreterError::Parser {
+                message: "Expected literal".to_string(),
+                token: self.clone(),
+                line,
+            }),
+        }
+    }
+
+    pub fn expect_identifier(&self) -> Result<String, InterpreterError> {
+        let line = self.line;
+        match &self.literal()? {
+            Literal::IDENTIFIER(v) => Ok(v.clone()),
+            _ => Err(InterpreterError::Parser {
+                message: "Expected identifier".to_string(),
+                token: self.clone(),
+                line: line,
+            }),
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub struct Scanner {
     source: String,
@@ -159,7 +186,17 @@ impl Scanner {
             '-' => Ok(self.add_token(TokenType::MINUS, None)),
             '+' => Ok(self.add_token(TokenType::PLUS, None)),
             ';' => Ok(self.add_token(TokenType::SEMICOLON, None)),
-            '*' => Ok(self.add_token(TokenType::STAR, None)),
+            '*' => {
+                let is_equal = self.match_next('*');
+                Ok(self.add_token(
+                    if is_equal {
+                        TokenType::Pow
+                    } else {
+                        TokenType::STAR
+                    },
+                    None,
+                ))
+            }
             '!' => {
                 let is_equal = self.match_next('=');
                 Ok(self.add_token(
@@ -227,7 +264,7 @@ impl Scanner {
             '"' => self.string(),
             val if self.is_digit(val) => self.number(),
             val if val.is_alphabetic() => Ok(self.identifier()),
-            _ => Err(InterpreterError::SyntaxError {
+            _ => Err(InterpreterError::Syntax {
                 line: self.line,
                 loc: self.get_loc(),
                 message: format!("Unrecognized lexeme: {}", c),
@@ -266,7 +303,7 @@ impl Scanner {
                 .unwrap_or_else(|err| self.err_stack.push(Rc::new(err)));
         }
         if !self.err_stack.is_empty() {
-            return Err(InterpreterError::ErrorStack {
+            return Err(InterpreterError::Stack {
                 stack: self.err_stack.clone(),
             });
         }
@@ -359,7 +396,7 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            return Err(InterpreterError::SyntaxError {
+            return Err(InterpreterError::Syntax {
                 line: self.line,
                 loc: self.get_loc(),
                 message: String::from("Unclosed string literal"),
@@ -398,7 +435,7 @@ impl Scanner {
         let num_value = num_string.parse::<f64>();
 
         if num_value.is_err() {
-            return Err(InterpreterError::SyntaxError {
+            return Err(InterpreterError::Syntax {
                 line: self.line,
                 loc: self.get_loc(),
                 message: String::from("Cannot parse number"),

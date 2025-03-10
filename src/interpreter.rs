@@ -1,25 +1,29 @@
 use crate::{
+    environment::Environment,
     error::InterpreterError,
     parser::Expr,
-    scanner::{Literal, TokenType},
+    scanner::{Literal, Token, TokenType},
     stmt::Stmt,
 };
 
-pub struct Interpreter {}
+pub struct Interpreter<'a> {
+    pub env: &'a mut Environment,
+}
 
-impl Interpreter {
-    pub fn interpret(&self, program: &[Stmt]) -> Result<(), InterpreterError> {
+impl<'a> Interpreter<'a> {
+    pub fn interpret(&mut self, program: &[Stmt]) -> Result<(), InterpreterError> {
         Ok(for stmt in program {
             self.execute(stmt)?;
         })
     }
-    fn execute(&self, stmt: &Stmt) -> Result<(), InterpreterError> {
+    fn execute(&mut self, stmt: &Stmt) -> Result<(), InterpreterError> {
         match stmt {
             Stmt::Expression(expr) => self.evaluate(expr).map(|_| {}),
             Stmt::Print(expr) => {
                 let evaluated = self.evaluate(expr)?;
                 Ok(self.execute_print(evaluated))
             }
+            Stmt::Var { expr, name } => self.execute_var(expr, name),
         }?;
         Ok(())
     }
@@ -31,6 +35,19 @@ impl Interpreter {
             Literal::BOOL(val) => println!("{}", val),
             Literal::NIL => println!("nil"),
         }
+    }
+    fn execute_var(&mut self, expr: &Option<Expr>, name: &Token) -> Result<(), InterpreterError> {
+        let mut right: Option<Literal> = None;
+
+        if let Some(t_expr) = expr {
+            let evaluated = self.evaluate(t_expr)?;
+            right = Some(evaluated);
+        }
+
+        let identifier = name.expect_identifier()?;
+        self.env.define(identifier, right)?;
+
+        Ok(())
     }
     fn evaluate(&self, expr: &Expr) -> Result<Literal, InterpreterError> {
         match expr {
@@ -45,13 +62,17 @@ impl Interpreter {
                 let left_eval = self.evaluate(&left)?;
 
                 match op.token_type {
-                    TokenType::MINUS | TokenType::PLUS | TokenType::STAR | TokenType::SLASH => {
+                    TokenType::MINUS
+                    | TokenType::PLUS
+                    | TokenType::STAR
+                    | TokenType::SLASH
+                    | TokenType::Pow => {
                         if let (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) =
                             (&left_eval, &right_eval)
                         {
                             self.evaluate_arithmetic(&op.token_type, *left_val, *right_val, op.line)
                         } else {
-                            Err(InterpreterError::RuntimeError {
+                            Err(InterpreterError::Runtime {
                                 message: "Cannot perform arithmetic on non-numbers".to_string(),
                                 token: Some(op.clone()),
                                 line: op.line,
@@ -68,7 +89,7 @@ impl Interpreter {
                         {
                             self.evaluate_comparison(&op.token_type, *left_val, *right_val, op.line)
                         } else {
-                            Err(InterpreterError::RuntimeError {
+                            Err(InterpreterError::Runtime {
                                 message: "Cannot perform comparison on non-numbers".to_string(),
                                 token: Some(op.clone()),
                                 line: op.line,
@@ -79,7 +100,7 @@ impl Interpreter {
                     TokenType::BangEqual | TokenType::EqualEqual => {
                         self.evaluate_equality(&op.token_type, &left_eval, &right_eval, op.line)
                     }
-                    _ => Err(InterpreterError::RuntimeError {
+                    _ => Err(InterpreterError::Runtime {
                         message: "Unsupported operator".to_string(),
                         token: Some(op.clone()),
                         line: op.line,
@@ -87,6 +108,7 @@ impl Interpreter {
                     }),
                 }
             }
+            Expr::Variable(token) => Ok(self.env.get(token.clone())?),
         }
     }
 
@@ -99,7 +121,7 @@ impl Interpreter {
         match op {
             TokenType::MINUS => match right {
                 Literal::NUMBER(number) => Ok(Literal::NUMBER(-number)),
-                _ => Err(InterpreterError::RuntimeError {
+                _ => Err(InterpreterError::Runtime {
                     message: "Cannot apply minus to non-number".to_string(),
                     token: None,
                     line,
@@ -107,7 +129,7 @@ impl Interpreter {
                 }),
             },
             TokenType::BANG => Ok(Literal::BOOL(!right.is_truthy())),
-            _ => Err(InterpreterError::RuntimeError {
+            _ => Err(InterpreterError::Runtime {
                 message: "Unhandled operator".to_string(),
                 token: None,
                 line,
@@ -127,9 +149,10 @@ impl Interpreter {
             TokenType::MINUS => Ok(Literal::NUMBER(left - right)),
             TokenType::PLUS => Ok(Literal::NUMBER(left + right)),
             TokenType::STAR => Ok(Literal::NUMBER(left * right)),
+            TokenType::Pow => Ok(Literal::NUMBER(left.powf(right))),
             TokenType::SLASH => {
                 if right == 0.0 {
-                    Err(InterpreterError::RuntimeError {
+                    Err(InterpreterError::Runtime {
                         message: "Division by zero".to_string(),
                         token: None,
                         line,
@@ -139,7 +162,7 @@ impl Interpreter {
                     Ok(Literal::NUMBER(left / right))
                 }
             }
-            _ => Err(InterpreterError::RuntimeError {
+            _ => Err(InterpreterError::Runtime {
                 message: "Unsupported arithmetic operator".to_string(),
                 token: None,
                 line,
@@ -160,7 +183,7 @@ impl Interpreter {
             TokenType::GREATER => Ok(Literal::BOOL(left > right)),
             TokenType::LessEqual => Ok(Literal::BOOL(left <= right)),
             TokenType::GreaterEqual => Ok(Literal::BOOL(left >= right)),
-            _ => Err(InterpreterError::RuntimeError {
+            _ => Err(InterpreterError::Runtime {
                 message: "Unsupported comparison operator".to_string(),
                 token: None,
                 line,
@@ -180,7 +203,7 @@ impl Interpreter {
             (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) => match op {
                 TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
                 TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
-                _ => Err(InterpreterError::RuntimeError {
+                _ => Err(InterpreterError::Runtime {
                     message: "Unsupported equality operator".to_string(),
                     token: None,
                     line,
@@ -190,7 +213,7 @@ impl Interpreter {
             (Literal::STRING(left_val), Literal::STRING(right_val)) => match op {
                 TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
                 TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
-                _ => Err(InterpreterError::RuntimeError {
+                _ => Err(InterpreterError::Runtime {
                     message: "Unsupported equality operator".to_string(),
                     token: None,
                     line,
@@ -200,7 +223,7 @@ impl Interpreter {
             (Literal::BOOL(left_val), Literal::BOOL(right_val)) => match op {
                 TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
                 TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
-                _ => Err(InterpreterError::RuntimeError {
+                _ => Err(InterpreterError::Runtime {
                     message: "Unsupported equality operator".to_string(),
                     token: None,
                     line,

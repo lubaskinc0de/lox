@@ -20,6 +20,7 @@ pub enum Expr {
     },
     Literal(Literal),
     Grouping(Box<Expr>),
+    Variable(Token),
 }
 
 pub struct Parser {
@@ -41,14 +42,51 @@ impl Parser {
     pub fn parse(&mut self) -> Result<Vec<Stmt>, InterpreterError> {
         let mut stmts: Vec<Stmt> = vec![];
         while !self.is_at_end() {
-            stmts.push(
-                self.statement()
-                    .map_err(|err| InterpreterError::ErrorStack {
-                        stack: vec![Rc::new(err)],
-                    })?,
-            );
+            stmts.push(self.declaration().map_err(|err| InterpreterError::Stack {
+                stack: vec![Rc::new(err)],
+            })?);
         }
         Ok(stmts)
+    }
+
+    fn declaration(&mut self) -> Result<Stmt, InterpreterError> {
+        let result = {
+            if self.matches(&[TokenType::VAR]) {
+                return self.var_declaration();
+            }
+
+            self.statement()
+        };
+
+        result
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt, InterpreterError> {
+        let token = self.peek();
+        let token_clone = token.clone();
+        let line = token.line;
+
+        let variable_token = self
+            .consume(TokenType::IDENTIFIER)
+            .ok_or(InterpreterError::Parser {
+                message: "Expected name after variable declaration".to_string(),
+                token: token_clone.clone(),
+                line,
+            })?
+            .clone();
+
+        variable_token.expect_identifier()?;
+
+        let mut variable_expr: Option<Expr> = None;
+        if self.matches(&[TokenType::EQUAL]) {
+            variable_expr = Some(self.expression()?);
+        }
+
+        self.expect_semicolon()?;
+        return Ok(Stmt::Var {
+            expr: variable_expr,
+            name: variable_token,
+        });
     }
 
     fn statement(&mut self) -> Result<Stmt, InterpreterError> {
@@ -65,7 +103,7 @@ impl Parser {
         let line = token.line;
 
         self.consume(TokenType::SEMICOLON)
-            .ok_or(InterpreterError::ParserError {
+            .ok_or(InterpreterError::Parser {
                 message: "Expected ';' after expression".to_string(),
                 token: token_clone,
                 line,
@@ -159,7 +197,21 @@ impl Parser {
                 op,
             });
         }
-        self.primary()
+        self.pow()
+    }
+
+    fn pow(&mut self) -> Result<Expr, InterpreterError> {
+        let mut expr = self.primary()?;
+        while self.matches(&[TokenType::Pow]) {
+            let op = self.prev().clone();
+            let right = self.primary()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+            }
+        }
+        Ok(expr)
     }
 
     fn primary(&mut self) -> Result<Expr, InterpreterError> {
@@ -178,7 +230,7 @@ impl Parser {
         }
 
         if self.matches(&[TokenType::IDENTIFIER]) {
-            return Ok(Expr::Literal(self.prev().literal.clone().unwrap()));
+            return Ok(Expr::Variable(self.prev().clone()));
         }
 
         if self.matches(&[TokenType::LeftParen]) {
@@ -186,7 +238,7 @@ impl Parser {
             let consumed = self.consume(TokenType::RightParen);
 
             if consumed.is_none() {
-                return Err(InterpreterError::ParserError {
+                return Err(InterpreterError::Parser {
                     message: String::from("Expect ')' after expression."),
                     token: self.peek().clone(),
                     line: self.peek().line,
@@ -195,7 +247,7 @@ impl Parser {
             return Ok(Expr::Grouping(Box::new(expr)));
         }
 
-        Err(InterpreterError::ParserError {
+        Err(InterpreterError::Parser {
             message: String::from("Expected expression"),
             token: self.peek().clone(),
             line: self.peek().line,
@@ -245,28 +297,5 @@ impl Parser {
             return Some(self.advance());
         }
         None
-    }
-
-    #[allow(dead_code)]
-    fn sync(&mut self) {
-        self.advance();
-
-        while !self.is_at_end() {
-            if self.prev().token_type == TokenType::SEMICOLON {
-                break;
-            }
-            match self.peek().token_type {
-                TokenType::CLASS
-                | TokenType::FUN
-                | TokenType::FOR
-                | TokenType::VAR
-                | TokenType::IF
-                | TokenType::PRINT
-                | TokenType::WHILE => break,
-                _ => {
-                    self.advance();
-                }
-            }
-        }
     }
 }

@@ -1,13 +1,16 @@
 use std::{
+    collections::HashMap,
     fs::File,
     io::{self, Read},
 };
 
 use crate::error::InterpreterError;
 use clap::Parser as CliParser;
+use environment::Environment;
 use interpreter::Interpreter;
 use parser::Parser;
 use scanner::Scanner;
+mod environment;
 mod error;
 mod interpreter;
 mod parser;
@@ -20,18 +23,20 @@ fn read_file_to_string(file_name: &str) -> String {
         .expect("File not found")
         .read_to_string(&mut buf)
         .unwrap();
-    println!("{}", buf);
     buf
 }
 
 fn run_file(file_name: &str) {
     let source: String = read_file_to_string(&file_name);
-    execute_panic(&source);
+    let mut env = Environment {
+        values: HashMap::new(),
+    };
+    execute_panic(&source, &mut env);
 }
 
-fn run(line: &str) -> Result<(), InterpreterError> {
+fn run(line: &str, env: &mut Environment) -> Result<(), InterpreterError> {
     let mut scanner = Scanner::new(line);
-    let interpreter = Interpreter {};
+    let mut interpreter = Interpreter { env };
     let tokens = scanner.scan_tokens()?;
 
     let mut parser = Parser::new(tokens.to_vec());
@@ -41,15 +46,15 @@ fn run(line: &str) -> Result<(), InterpreterError> {
     Ok(())
 }
 
-fn execute_safe(line: &str) {
-    match run(line) {
+fn execute_safe(line: &str, env: &mut Environment) {
+    match run(line, env) {
         Ok(_s) => {}
         Err(e) => println!("{}", e),
     }
 }
 
-fn execute_panic(line: &str) {
-    match run(line) {
+fn execute_panic(line: &str, env: &mut Environment) {
+    match run(line, env) {
         Ok(_s) => {}
         Err(e) => panic!("{}", e),
     }
@@ -58,6 +63,9 @@ fn execute_panic(line: &str) {
 fn run_prompt() {
     println!("RLox REPL:");
     let mut input = String::new();
+    let mut env = Environment {
+        values: HashMap::new(),
+    };
     loop {
         input.clear();
         eprint!("> ");
@@ -69,7 +77,7 @@ fn run_prompt() {
             break;
         }
 
-        execute_safe(&input);
+        execute_safe(&input, &mut env);
     }
 }
 
