@@ -39,7 +39,7 @@ fn run(line: &str, env: &mut Environment) -> Result<(), InterpreterError> {
     let mut interpreter = Interpreter { env };
     let tokens = scanner.scan_tokens()?;
 
-    let mut parser = Parser::new(tokens.to_vec());
+    let parser = Parser::new(&tokens);
     let statements = parser.parse()?;
 
     interpreter.interpret(&statements)?;

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::{
     environment::Environment,
     error::InterpreterError,
@@ -21,13 +23,13 @@ impl<'a> Interpreter<'a> {
             Stmt::Expression(expr) => self.evaluate(expr).map(|_| {}),
             Stmt::Print(expr) => {
                 let evaluated = self.evaluate(expr)?;
-                Ok(self.execute_print(evaluated))
+                Ok(self.execute_print(evaluated.as_ref()))
             }
             Stmt::Var { expr, name } => self.execute_var(expr, name),
         }?;
         Ok(())
     }
-    fn execute_print(&self, val: Literal) {
+    fn execute_print(&self, val: &Literal) {
         match val {
             Literal::IDENTIFIER(val) => println!("{}", val),
             Literal::STRING(val) => println!("{}", val),
@@ -41,7 +43,7 @@ impl<'a> Interpreter<'a> {
 
         if let Some(t_expr) = expr {
             let evaluated = self.evaluate(t_expr)?;
-            right = Some(evaluated);
+            right = Some(evaluated.into_owned());
         }
 
         let identifier = name.expect_identifier()?;
@@ -49,13 +51,14 @@ impl<'a> Interpreter<'a> {
 
         Ok(())
     }
-    fn evaluate(&self, expr: &Expr) -> Result<Literal, InterpreterError> {
+    fn evaluate(&self, expr: &'a Expr) -> Result<Cow<'_, Literal>, InterpreterError> {
         match expr {
-            Expr::Literal(val) => Ok(val.clone()),
+            Expr::Literal(val) => Ok(Cow::Borrowed(val)),
             Expr::Grouping(expr) => self.evaluate(&expr),
             Expr::Unary { right, op } => {
                 let evaluated = self.evaluate(&right)?;
-                self.evaluate_unary(&op.token_type, evaluated, op.line)
+                let lit = self.evaluate_unary(&op.token_type, evaluated.as_ref(), op.line)?;
+                Ok(Cow::Owned(lit))
             }
             Expr::Binary { left, op, right } => {
                 let right_eval = self.evaluate(&right)?;
@@ -68,13 +71,19 @@ impl<'a> Interpreter<'a> {
                     | TokenType::SLASH
                     | TokenType::Pow => {
                         if let (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) =
-                            (&left_eval, &right_eval)
+                            (left_eval.as_ref(), right_eval.as_ref())
                         {
-                            self.evaluate_arithmetic(&op.token_type, *left_val, *right_val, op.line)
+                            let lit = self.evaluate_arithmetic(
+                                &op.token_type,
+                                *left_val,
+                                *right_val,
+                                op.line,
+                            )?;
+                            Ok(Cow::Owned(lit))
                         } else {
                             Err(InterpreterError::Runtime {
                                 message: "Cannot perform arithmetic on non-numbers".to_string(),
-                                token: Some(op.clone()),
+                                token: Some(op.to_owned().clone()),
                                 line: op.line,
                                 hint: "Ensure both operands are numbers".to_string(),
                             })
@@ -85,37 +94,52 @@ impl<'a> Interpreter<'a> {
                     | TokenType::LessEqual
                     | TokenType::GreaterEqual => {
                         if let (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) =
-                            (&left_eval, &right_eval)
+                            (left_eval.as_ref(), right_eval.as_ref())
                         {
-                            self.evaluate_comparison(&op.token_type, *left_val, *right_val, op.line)
+                            let lit = self.evaluate_comparison(
+                                &op.token_type,
+                                *left_val,
+                                *right_val,
+                                op.line,
+                            )?;
+                            Ok(Cow::Owned(lit))
                         } else {
                             Err(InterpreterError::Runtime {
                                 message: "Cannot perform comparison on non-numbers".to_string(),
-                                token: Some(op.clone()),
+                                token: Some(op.to_owned().clone()),
                                 line: op.line,
                                 hint: "Ensure both operands are numbers".to_string(),
                             })
                         }
                     }
                     TokenType::BangEqual | TokenType::EqualEqual => {
-                        self.evaluate_equality(&op.token_type, &left_eval, &right_eval, op.line)
+                        let lit = self.evaluate_equality(
+                            &op.token_type,
+                            &left_eval,
+                            &right_eval,
+                            op.line,
+                        )?;
+                        Ok(Cow::Owned(lit))
                     }
                     _ => Err(InterpreterError::Runtime {
                         message: "Unsupported operator".to_string(),
-                        token: Some(op.clone()),
+                        token: Some(op.to_owned().clone()),
                         line: op.line,
                         hint: "Check the operator and try again".to_string(),
                     }),
                 }
             }
-            Expr::Variable(token) => Ok(self.env.get(token.clone())?),
+            Expr::Variable(token) => {
+                let var = self.env.get(&token)?;
+                Ok(Cow::Borrowed(var))
+            }
         }
     }
 
     fn evaluate_unary(
         &self,
         op: &TokenType,
-        right: Literal,
+        right: &Literal,
         line: usize,
     ) -> Result<Literal, InterpreterError> {
         match op {

@@ -296,7 +296,7 @@ impl Scanner {
         return c.is_digit(10);
     }
 
-    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, InterpreterError> {
+    pub fn scan_tokens(&mut self) -> Result<Vec<Token>, InterpreterError> {
         while !(self.is_at_end()) {
             self.start = self.current;
             self.scan_token()
@@ -313,7 +313,7 @@ impl Scanner {
             literal: None,
             line: self.line,
         });
-        Ok(&self.tokens)
+        Ok(self.tokens.clone())
     }
 
     fn char_at(&self, index: usize) -> char {

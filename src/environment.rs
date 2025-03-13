@@ -7,20 +7,20 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct Environment {
-    pub values: HashMap<String, Option<Literal>>,
+    pub values: HashMap<String, Literal>,
 }
 
-impl Environment {
+impl<'a> Environment {
     pub fn define(&mut self, name: String, value: Option<Literal>) -> Result<(), InterpreterError> {
-        self.values.insert(name, value);
+        self.values
+            .insert(name, value.or_else(|| Some(Literal::NIL)).unwrap());
         Ok(())
     }
 
-    pub fn get(&self, name: Token) -> Result<Literal, InterpreterError> {
+    pub fn get(&'a self, name: &Token) -> Result<&'a Literal, InterpreterError> {
         let var_name = name.expect_identifier()?;
 
-        let val = self
-            .values
+        self.values
             .get(var_name.as_str())
             .ok_or(InterpreterError::Runtime {
                 message: "Variable is not defined".to_string(),
@@ -28,7 +28,5 @@ impl Environment {
                 line: name.line,
                 hint: "Check your declarations".to_string(),
             })
-            .cloned()?;
-        Ok(val.or_else(|| Some(Literal::NIL)).unwrap())
     }
 }
