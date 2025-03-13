@@ -4,7 +4,6 @@ use std::{
     io::{self, Read},
 };
 
-use crate::error::InterpreterError;
 use clap::Parser as CliParser;
 use environment::Environment;
 use interpreter::Interpreter;
@@ -31,33 +30,48 @@ fn run_file(file_name: &str) {
     let mut env = Environment {
         values: HashMap::new(),
     };
-    execute_panic(&source, &mut env);
+    run(&source, &mut env, true);
 }
 
-fn run(line: &str, env: &mut Environment) -> Result<(), InterpreterError> {
+fn run(line: &str, env: &mut Environment, do_panic: bool) {
     let mut scanner = Scanner::new(line);
     let mut interpreter = Interpreter { env };
-    let tokens = scanner.scan_tokens()?;
+    let tokens = match scanner.scan_tokens() {
+        Ok(v) => v,
+        Err(e) => {
+            if do_panic {
+                panic!("{}", e)
+            } else {
+                println!("{}", e);
+                return;
+            }
+        }
+    };
 
     let parser = Parser::new(&tokens);
-    let statements = parser.parse()?;
+    let statements = match parser.parse() {
+        Ok(v) => v,
+        Err(e) => {
+            if do_panic {
+                panic!("{}", e)
+            } else {
+                println!("{}", e);
+                return;
+            }
+        }
+    };
 
-    interpreter.interpret(&statements)?;
-    Ok(())
-}
-
-fn execute_safe(line: &str, env: &mut Environment) {
-    match run(line, env) {
-        Ok(_s) => {}
-        Err(e) => println!("{}", e),
-    }
-}
-
-fn execute_panic(line: &str, env: &mut Environment) {
-    match run(line, env) {
-        Ok(_s) => {}
-        Err(e) => panic!("{}", e),
-    }
+    match interpreter.interpret(&statements) {
+        Ok(v) => v,
+        Err(e) => {
+            if do_panic {
+                panic!("{}", e)
+            } else {
+                println!("{}", e);
+                return;
+            }
+        }
+    };
 }
 
 fn run_prompt() {
@@ -77,7 +91,7 @@ fn run_prompt() {
             break;
         }
 
-        execute_safe(&input, &mut env);
+        run(&input, &mut env, false);
     }
 }
 
