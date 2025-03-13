@@ -18,7 +18,7 @@ pub enum Expr<'a> {
         right: Box<Expr<'a>>,
         op: &'a Token,
     },
-    Literal(Literal),
+    Literal(&'a Literal),
     Grouping(Box<Expr<'a>>),
     Variable(&'a Token),
 }
@@ -215,17 +215,17 @@ impl<'a> Parser<'a> {
 
     fn primary(&self) -> Result<Expr, InterpreterError> {
         if self.matches(&[TokenType::FALSE]) {
-            return Ok(Expr::Literal(Literal::BOOL(false)));
+            return Ok(Expr::Literal(&Literal::BOOL(false)));
         }
         if self.matches(&[TokenType::TRUE]) {
-            return Ok(Expr::Literal(Literal::BOOL(true)));
+            return Ok(Expr::Literal(&Literal::BOOL(true)));
         }
         if self.matches(&[TokenType::NIL]) {
-            return Ok(Expr::Literal(Literal::NIL));
+            return Ok(Expr::Literal(&Literal::NIL));
         }
 
         if self.matches(&[TokenType::NUMBER, TokenType::STRING]) {
-            return Ok(Expr::Literal((self.prev().literal.clone()).unwrap()));
+            return Ok(Expr::Literal((self.prev().literal.as_ref()).unwrap()));
         }
 
         if self.matches(&[TokenType::IDENTIFIER]) {
