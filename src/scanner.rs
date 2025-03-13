@@ -99,7 +99,7 @@ impl fmt::Display for Token {
                 "[Token {:?}] Lexeme: '{}' -- {:?}",
                 self.token_type,
                 self.lexeme,
-                self.literal.clone().unwrap()
+                &self.literal,
             )
         } else {
             write!(f, "[Token {:?}] Lexeme: '{}'", self.token_type, self.lexeme)
@@ -108,26 +108,22 @@ impl fmt::Display for Token {
 }
 
 impl Token {
-    pub fn literal(&self) -> Result<Literal, InterpreterError> {
+    pub fn expect_identifier(&self) -> Result<String, InterpreterError> {
         let line = self.line;
+
         match &self.literal {
-            Some(literal) => Ok(literal.clone()),
+            Some(literal) => match literal {
+                Literal::IDENTIFIER(v) => Ok(v.to_string()),
+                _ => Err(InterpreterError::Parser {
+                    message: "Expected identifier".to_string(),
+                    token: self.clone(),
+                    line,
+                }),
+            },
             None => Err(InterpreterError::Parser {
                 message: "Expected literal".to_string(),
                 token: self.clone(),
                 line,
-            }),
-        }
-    }
-
-    pub fn expect_identifier(&self) -> Result<String, InterpreterError> {
-        let line = self.line;
-        match &self.literal()? {
-            Literal::IDENTIFIER(v) => Ok(v.clone()),
-            _ => Err(InterpreterError::Parser {
-                message: "Expected identifier".to_string(),
-                token: self.clone(),
-                line: line,
             }),
         }
     }
@@ -459,11 +455,10 @@ impl Scanner {
         }
 
         let identifier_value = self.substr(self.start, self.current);
-        let identifier_literal = Literal::IDENTIFIER(identifier_value.clone());
 
         match self.keywords.get(&identifier_value) {
-            Some(val) => self.add_token(val.clone(), Some(identifier_literal)),
-            None => self.add_token(TokenType::IDENTIFIER, Some(identifier_literal)),
+            Some(val) => self.add_token(val.clone(), Some(Literal::IDENTIFIER(identifier_value))),
+            None => self.add_token(TokenType::IDENTIFIER, Some(Literal::IDENTIFIER(identifier_value))),
         }
     }
 }
