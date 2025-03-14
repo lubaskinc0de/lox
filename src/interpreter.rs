@@ -25,7 +25,7 @@ impl<'a> Interpreter<'a> {
                 let evaluated = self.evaluate(expr)?;
                 Ok(self.execute_print(evaluated.as_ref()))
             }
-            Stmt::Var { expr, name } => self.execute_var(expr, name),
+            Stmt::VarDeclaration { expr, name } => self.execute_var(expr, name),
         }?;
         Ok(())
     }
@@ -129,7 +129,7 @@ impl<'a> Interpreter<'a> {
                     }),
                 }
             }
-            Expr::Variable(token) => {
+            Expr::VarRead(token) => {
                 let var = self.env.get(&token)?;
                 Ok(Cow::Borrowed(var))
             }

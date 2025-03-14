@@ -4,5 +4,8 @@ use crate::{parser::Expr, scanner::Token};
 pub enum Stmt<'a> {
     Expression(Expr<'a>),
     Print(Expr<'a>),
-    Var { expr: Option<Expr<'a>>, name: &'a Token },
+    VarDeclaration {
+        expr: Option<Expr<'a>>,
+        name: &'a Token,
+    },
 }

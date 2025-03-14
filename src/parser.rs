@@ -20,7 +20,7 @@ pub enum Expr<'a> {
     },
     Literal(&'a Literal),
     Grouping(Box<Expr<'a>>),
-    Variable(&'a Token),
+    VarRead(&'a Token),
 }
 
 pub struct Parser<'a> {
@@ -63,13 +63,13 @@ impl<'a> Parser<'a> {
     }
 
     fn var_declaration(&self) -> Result<Stmt, InterpreterError> {
-        let token = self.peek().clone();
+        let token = self.peek();
         let line = token.line;
 
         let consumed = self.consume(TokenType::IDENTIFIER);
         let variable_token = consumed.ok_or(InterpreterError::Parser {
             message: "Expected name after variable declaration".to_string(),
-            token: token,
+            token: token.clone(),
             line,
         })?;
 
@@ -82,7 +82,7 @@ impl<'a> Parser<'a> {
         }
 
         self.expect_semicolon()?;
-        return Ok(Stmt::Var {
+        return Ok(Stmt::VarDeclaration {
             expr: variable_expr,
             name: variable_token,
         });
@@ -229,7 +229,7 @@ impl<'a> Parser<'a> {
         }
 
         if self.matches(&[TokenType::IDENTIFIER]) {
-            return Ok(Expr::Variable(self.prev()));
+            return Ok(Expr::VarRead(self.prev()));
         }
 
         let is_left_paren = self.matches(&[TokenType::LeftParen]);
