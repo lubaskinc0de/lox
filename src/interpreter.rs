@@ -23,13 +23,13 @@ impl<'a> Interpreter<'a> {
             Stmt::Expression(expr) => self.evaluate(expr).map(|_| {}),
             Stmt::Print(expr) => {
                 let evaluated = self.evaluate(expr)?;
-                Ok(self.execute_print(evaluated.as_ref()))
+                Ok(Interpreter::execute_print(evaluated.as_ref()))
             }
             Stmt::VarDeclaration { expr, name } => self.execute_var(expr, name),
         }?;
         Ok(())
     }
-    fn execute_print(&self, val: &Literal) {
+    fn execute_print(val: &Literal) {
         match val {
             Literal::IDENTIFIER(val) => println!("{}", val),
             Literal::STRING(val) => println!("{}", val),
