@@ -13,12 +13,12 @@ pub struct Interpreter<'a> {
 }
 
 impl<'a> Interpreter<'a> {
-    pub fn interpret(&mut self, program: &[Stmt]) -> Result<(), InterpreterError> {
+    pub fn interpret(&mut self, program: &'a [Stmt]) -> Result<(), InterpreterError> {
         Ok(for stmt in program {
             self.execute(stmt)?;
         })
     }
-    fn execute(&mut self, stmt: &Stmt) -> Result<(), InterpreterError> {
+    fn execute(&mut self, stmt: &'a Stmt) -> Result<(), InterpreterError> {
         match stmt {
             Stmt::Expression(expr) => self.evaluate(expr).map(|_| {}),
             Stmt::Print(expr) => {
@@ -38,7 +38,11 @@ impl<'a> Interpreter<'a> {
             Literal::NIL => println!("nil"),
         }
     }
-    fn execute_var(&mut self, expr: &Option<Expr>, name: &Token) -> Result<(), InterpreterError> {
+    fn execute_var(
+        &mut self,
+        expr: &'a Option<Expr>,
+        name: &Token,
+    ) -> Result<(), InterpreterError> {
         let mut right: Option<Literal> = None;
 
         if let Some(t_expr) = expr {
@@ -51,7 +55,8 @@ impl<'a> Interpreter<'a> {
 
         Ok(())
     }
-    fn evaluate(&self, expr: &'a Expr) -> Result<Cow<'_, Literal>, InterpreterError> {
+
+    fn evaluate<'b>(&'b mut self, expr: &'a Expr) -> Result<Cow<'b, Literal>, InterpreterError> {
         match expr {
             Expr::Literal(val) => Ok(Cow::Borrowed(val)),
             Expr::Grouping(expr) => self.evaluate(&expr),
@@ -75,8 +80,8 @@ impl<'a> Interpreter<'a> {
                         {
                             let lit = self.evaluate_arithmetic(
                                 &op.token_type,
-                                *left_val,
-                                *right_val,
+                                left_val,
+                                right_val,
                                 op.line,
                             )?;
                             Ok(Cow::Owned(lit))
@@ -98,8 +103,8 @@ impl<'a> Interpreter<'a> {
                         {
                             let lit = self.evaluate_comparison(
                                 &op.token_type,
-                                *left_val,
-                                *right_val,
+                                left_val,
+                                right_val,
                                 op.line,
                             )?;
                             Ok(Cow::Owned(lit))
@@ -133,6 +138,12 @@ impl<'a> Interpreter<'a> {
                 let var = self.env.get(&token)?;
                 Ok(Cow::Borrowed(var))
             }
+            Expr::Assign { name, value } => {
+                let evaluated = self.evaluate(&value)?;
+                let scalar = Some(evaluated.into_owned());
+                let ret = self.env.assign(name, scalar)?;
+                Ok(Cow::Owned(ret.clone()))
+            }
         }
     }
 
@@ -165,17 +176,17 @@ impl<'a> Interpreter<'a> {
     fn evaluate_arithmetic(
         &self,
         op: &TokenType,
-        left: f64,
-        right: f64,
+        left: &f64,
+        right: &f64,
         line: usize,
     ) -> Result<Literal, InterpreterError> {
         match op {
             TokenType::MINUS => Ok(Literal::NUMBER(left - right)),
             TokenType::PLUS => Ok(Literal::NUMBER(left + right)),
             TokenType::STAR => Ok(Literal::NUMBER(left * right)),
-            TokenType::Pow => Ok(Literal::NUMBER(left.powf(right))),
+            TokenType::Pow => Ok(Literal::NUMBER(left.powf(*right))),
             TokenType::SLASH => {
-                if right == 0.0 {
+                if *right == 0.0 {
                     Err(InterpreterError::Runtime {
                         message: "Division by zero".to_string(),
                         token: None,
@@ -198,8 +209,8 @@ impl<'a> Interpreter<'a> {
     fn evaluate_comparison(
         &self,
         op: &TokenType,
-        left: f64,
-        right: f64,
+        left: &f64,
+        right: &f64,
         line: usize,
     ) -> Result<Literal, InterpreterError> {
         match op {

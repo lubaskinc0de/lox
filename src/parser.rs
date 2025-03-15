@@ -21,6 +21,10 @@ pub enum Expr<'a> {
     Literal(&'a Literal),
     Grouping(Box<Expr<'a>>),
     VarRead(&'a Token),
+    Assign {
+        name: &'a Token,
+        value: Box<Expr<'a>>,
+    },
 }
 
 pub struct Parser<'a> {
@@ -122,7 +126,29 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&self) -> Result<Expr, InterpreterError> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&self) -> Result<Expr, InterpreterError> {
+        let expr = self.equality()?;
+
+        if self.matches(&[TokenType::EQUAL]) {
+            let equals = self.prev();
+            let value = self.assignment()?;
+
+            return match expr {
+                Expr::VarRead(name_token) => Ok(Expr::Assign {
+                    name: name_token,
+                    value: Box::new(value),
+                }),
+                _ => Err(InterpreterError::Parser {
+                    message: String::from("Invalid assignment target"),
+                    token: equals.clone(),
+                    line: equals.line,
+                }),
+            };
+        }
+        Ok(expr)
     }
 
     fn equality(&self) -> Result<Expr, InterpreterError> {

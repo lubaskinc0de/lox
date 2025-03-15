@@ -29,4 +29,22 @@ impl<'a> Environment {
                 hint: "Check your declarations".to_string(),
             })
     }
+
+    pub fn assign(
+        &'a mut self,
+        name: &Token,
+        value: Option<Literal>,
+    ) -> Result<&'a Literal, InterpreterError> {
+        let id = name.expect_identifier()?;
+        if !self.values.contains_key(id.as_str()) {
+            return Err(InterpreterError::Runtime {
+                message: "Variable is not defined".to_string(),
+                token: Some(name.clone()),
+                line: name.line,
+                hint: "Check your declarations".to_string(),
+            });
+        }
+        self.define(id, value)?;
+        Ok(self.get(name)?)
+    }
 }
