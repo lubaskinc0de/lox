@@ -36,7 +36,7 @@ fn run_file(file_name: &str) {
 
 fn run(line: &str, env: &mut Environment, do_panic: bool) {
     let mut scanner = Scanner::new(line);
-    let mut interpreter = Interpreter {};
+
     let tokens = match scanner.scan_tokens() {
         Ok(v) => v,
         Err(e) => {
@@ -62,7 +62,7 @@ fn run(line: &str, env: &mut Environment, do_panic: bool) {
         }
     };
 
-    match interpreter.interpret(&statements, env) {
+    match Interpreter::interpret(&statements, env) {
         Ok(v) => v,
         Err(e) => {
             if do_panic {
