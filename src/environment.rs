@@ -6,12 +6,11 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Environment<'a> {
+pub struct Environment {
     pub values: HashMap<String, Literal>,
-    pub enclosing: Option<&'a Environment<'a>>,
 }
 
-impl<'a> Environment<'a> {
+impl<'a> Environment {
     pub fn define(&mut self, name: String, value: Option<Literal>) -> Result<(), InterpreterError> {
         self.values
             .insert(name, value.or_else(|| Some(Literal::NIL)).unwrap());
