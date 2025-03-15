@@ -65,78 +65,99 @@ impl<'a> Interpreter<'a> {
                 let lit = Interpreter::evaluate_unary(&op.token_type, evaluated.as_ref(), op.line)?;
                 Ok(Cow::Owned(lit))
             }
-            Expr::Binary { left, op, right } => {
-                let rhs = self.evaluate(&right)?;
-                let right_eval = rhs.as_ref();
+            Expr::Binary { left, op, right } => match op.token_type {
+                TokenType::MINUS
+                | TokenType::PLUS
+                | TokenType::STAR
+                | TokenType::SLASH
+                | TokenType::Pow => {
+                    let rhs = self.evaluate(&right)?;
+                    let l;
+                    let r;
 
-                let lhs = self.evaluate(&left)?;
-                let left_eval = lhs.as_ref();
+                    if let Literal::NUMBER(right_val) = rhs.as_ref() {
+                        r = *right_val;
+                    } else {
+                        return Err(InterpreterError::Runtime {
+                            message: "Cannot perform arithmetic on non-numbers".to_string(),
+                            token: Some(op.to_owned().clone()),
+                            line: op.line,
+                            hint: "Ensure both operands are numbers".to_string(),
+                        });
+                    }
 
-                match op.token_type {
-                    TokenType::MINUS
-                    | TokenType::PLUS
-                    | TokenType::STAR
-                    | TokenType::SLASH
-                    | TokenType::Pow => {
-                        if let (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) =
-                            (left_eval, right_eval)
-                        {
-                            let lit = Interpreter::evaluate_arithmetic(
-                                &op.token_type,
-                                left_val,
-                                right_val,
-                                op.line,
-                            )?;
-                            Ok(Cow::Owned(lit))
-                        } else {
-                            Err(InterpreterError::Runtime {
-                                message: "Cannot perform arithmetic on non-numbers".to_string(),
-                                token: Some(op.to_owned().clone()),
-                                line: op.line,
-                                hint: "Ensure both operands are numbers".to_string(),
-                            })
-                        }
+                    let lhs = self.evaluate(&left)?;
+                    if let Literal::NUMBER(left_val) = lhs.as_ref() {
+                        l = *left_val;
+                    } else {
+                        return Err(InterpreterError::Runtime {
+                            message: "Cannot perform arithmetic on non-numbers".to_string(),
+                            token: Some(op.to_owned().clone()),
+                            line: op.line,
+                            hint: "Ensure both operands are numbers".to_string(),
+                        });
                     }
-                    TokenType::LESS
-                    | TokenType::GREATER
-                    | TokenType::LessEqual
-                    | TokenType::GreaterEqual => {
-                        if let (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) =
-                            (left_eval, right_eval)
-                        {
-                            let lit = Interpreter::evaluate_comparison(
-                                &op.token_type,
-                                left_val,
-                                right_val,
-                                op.line,
-                            )?;
-                            Ok(Cow::Owned(lit))
-                        } else {
-                            Err(InterpreterError::Runtime {
-                                message: "Cannot perform comparison on non-numbers".to_string(),
-                                token: Some(op.to_owned().clone()),
-                                line: op.line,
-                                hint: "Ensure both operands are numbers".to_string(),
-                            })
-                        }
-                    }
-                    TokenType::BangEqual | TokenType::EqualEqual => {
-                        let lit = Interpreter::evaluate_equality(
-                            &op.token_type,
-                            &left_eval,
-                            &right_eval,
-                            op.line,
-                        )?;
-                        Ok(Cow::Owned(lit))
-                    }
-                    _ => Err(InterpreterError::Runtime {
-                        message: "Unsupported operator".to_string(),
-                        token: Some(op.to_owned().clone()),
-                        line: op.line,
-                        hint: "Check the operator and try again".to_string(),
-                    }),
+
+                    let lit = Interpreter::evaluate_arithmetic(&op.token_type, &l, &r, op.line)?;
+                    Ok(Cow::Owned(lit))
                 }
-            }
+                TokenType::LESS
+                | TokenType::GREATER
+                | TokenType::LessEqual
+                | TokenType::GreaterEqual => {
+                    let rhs = self.evaluate(&right)?;
+                    let l;
+                    let r;
+
+                    if let Literal::NUMBER(right_val) = rhs.as_ref() {
+                        r = *right_val;
+                    } else {
+                        return Err(InterpreterError::Runtime {
+                            message: "Cannot perform arithmetic on non-numbers".to_string(),
+                            token: Some(op.to_owned().clone()),
+                            line: op.line,
+                            hint: "Ensure both operands are numbers".to_string(),
+                        });
+                    }
+
+                    let lhs = self.evaluate(&left)?;
+                    if let Literal::NUMBER(left_val) = lhs.as_ref() {
+                        l = *left_val;
+                    } else {
+                        return Err(InterpreterError::Runtime {
+                            message: "Cannot perform arithmetic on non-numbers".to_string(),
+                            token: Some(op.to_owned().clone()),
+                            line: op.line,
+                            hint: "Ensure both operands are numbers".to_string(),
+                        });
+                    }
+
+                    let lit = Interpreter::evaluate_comparison(
+                        &op.token_type,
+                        &l,
+                        &r,
+                        op.line,
+                    )?;
+                    Ok(Cow::Owned(lit))
+                }
+                TokenType::BangEqual | TokenType::EqualEqual => {
+                    let rhs = self.evaluate(&right)?.into_owned();
+                    let lhs = self.evaluate(&left)?;
+                    let lit = Interpreter::evaluate_equality(
+                        &op.token_type,
+                        lhs.as_ref(),
+                        &rhs,
+                        op.line,
+                    )?;
+                    Ok(Cow::Owned(lit))
+                }
+                _ => Err(InterpreterError::Runtime {
+                    message: "Unsupported operator".to_string(),
+                    token: Some(op.to_owned().clone()),
+                    line: op.line,
+                    hint: "Check the operator and try again".to_string(),
+                }),
+            },
             Expr::VarRead(token) => {
                 let var = self.env.get(&token)?;
                 Ok(Cow::Borrowed(var))
