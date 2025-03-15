@@ -66,8 +66,11 @@ impl<'a> Interpreter<'a> {
                 Ok(Cow::Owned(lit))
             }
             Expr::Binary { left, op, right } => {
-                let right_eval = self.evaluate(&right)?;
-                let left_eval = self.evaluate(&left)?;
+                let rhs = self.evaluate(&right)?;
+                let right_eval = rhs.as_ref();
+
+                let lhs = self.evaluate(&left)?;
+                let left_eval = lhs.as_ref();
 
                 match op.token_type {
                     TokenType::MINUS
@@ -76,7 +79,7 @@ impl<'a> Interpreter<'a> {
                     | TokenType::SLASH
                     | TokenType::Pow => {
                         if let (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) =
-                            (left_eval.as_ref(), right_eval.as_ref())
+                            (left_eval, right_eval)
                         {
                             let lit = Interpreter::evaluate_arithmetic(
                                 &op.token_type,
@@ -99,7 +102,7 @@ impl<'a> Interpreter<'a> {
                     | TokenType::LessEqual
                     | TokenType::GreaterEqual => {
                         if let (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) =
-                            (left_eval.as_ref(), right_eval.as_ref())
+                            (left_eval, right_eval)
                         {
                             let lit = Interpreter::evaluate_comparison(
                                 &op.token_type,
