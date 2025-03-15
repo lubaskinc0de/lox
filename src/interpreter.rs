@@ -62,7 +62,7 @@ impl<'a> Interpreter<'a> {
             Expr::Grouping(expr) => self.evaluate(&expr),
             Expr::Unary { right, op } => {
                 let evaluated = self.evaluate(&right)?;
-                let lit = self.evaluate_unary(&op.token_type, evaluated.as_ref(), op.line)?;
+                let lit = Interpreter::evaluate_unary(&op.token_type, evaluated.as_ref(), op.line)?;
                 Ok(Cow::Owned(lit))
             }
             Expr::Binary { left, op, right } => {
@@ -78,7 +78,7 @@ impl<'a> Interpreter<'a> {
                         if let (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) =
                             (left_eval.as_ref(), right_eval.as_ref())
                         {
-                            let lit = self.evaluate_arithmetic(
+                            let lit = Interpreter::evaluate_arithmetic(
                                 &op.token_type,
                                 left_val,
                                 right_val,
@@ -101,7 +101,7 @@ impl<'a> Interpreter<'a> {
                         if let (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) =
                             (left_eval.as_ref(), right_eval.as_ref())
                         {
-                            let lit = self.evaluate_comparison(
+                            let lit = Interpreter::evaluate_comparison(
                                 &op.token_type,
                                 left_val,
                                 right_val,
@@ -118,7 +118,7 @@ impl<'a> Interpreter<'a> {
                         }
                     }
                     TokenType::BangEqual | TokenType::EqualEqual => {
-                        let lit = self.evaluate_equality(
+                        let lit = Interpreter::evaluate_equality(
                             &op.token_type,
                             &left_eval,
                             &right_eval,
@@ -148,7 +148,6 @@ impl<'a> Interpreter<'a> {
     }
 
     fn evaluate_unary(
-        &self,
         op: &TokenType,
         right: &Literal,
         line: usize,
@@ -174,7 +173,6 @@ impl<'a> Interpreter<'a> {
     }
 
     fn evaluate_arithmetic(
-        &self,
         op: &TokenType,
         left: &f64,
         right: &f64,
@@ -207,7 +205,6 @@ impl<'a> Interpreter<'a> {
     }
 
     fn evaluate_comparison(
-        &self,
         op: &TokenType,
         left: &f64,
         right: &f64,
@@ -228,7 +225,6 @@ impl<'a> Interpreter<'a> {
     }
 
     fn evaluate_equality(
-        &self,
         op: &TokenType,
         left: &Literal,
         right: &Literal,
