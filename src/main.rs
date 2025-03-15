@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     fs::File,
     io::{self, Read},
 };
@@ -28,9 +27,7 @@ fn read_file_to_string(file_name: &str) -> String {
 
 fn run_file(file_name: &str) {
     let source: String = read_file_to_string(&file_name);
-    let mut env = Environment {
-        values: HashMap::new(),
-    };
+    let mut env = Environment::new(None);
     run(&source, &mut env, true);
 }
 
@@ -78,9 +75,7 @@ fn run(line: &str, env: &mut Environment, do_panic: bool) {
 fn run_prompt() {
     println!("RLox REPL:");
     let mut input = String::new();
-    let mut env = Environment {
-        values: HashMap::new(),
-    };
+    let mut env = Environment::new(None);
     loop {
         input.clear();
         eprint!("> ");

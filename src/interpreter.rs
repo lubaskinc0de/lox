@@ -21,10 +21,7 @@ impl<'a> Interpreter {
         })
     }
 
-    fn execute_statement(
-        stmt: &'a Stmt,
-        env: &'a mut Environment,
-    ) -> Result<(), InterpreterError> {
+    fn execute_statement(stmt: &'a Stmt, env: &'a mut Environment) -> Result<(), InterpreterError> {
         match stmt {
             Stmt::Expression(expr) => Interpreter::eval(expr, env).map(|_| {}),
             Stmt::Print(expr) => {
@@ -58,9 +55,7 @@ impl<'a> Interpreter {
             right = Some(evaluated.into_owned());
         }
 
-        let identifier = name.expect_identifier()?;
-        env.define(identifier, right)?;
-
+        env.define(name, right)?;
         Ok(())
     }
 
@@ -161,13 +156,14 @@ impl<'a> Interpreter {
             },
             Expr::VarRead(token) => {
                 let var = env.get(&token)?;
-                Ok(Cow::Borrowed(var))
+                Ok(var)
             }
             Expr::Assign { name, value } => {
                 let evaluated = Interpreter::eval(&value, env)?;
                 let scalar = Some(evaluated.into_owned());
                 let ret = env.assign(name, scalar)?;
-                Ok(Cow::Owned(ret.clone()))
+                let owned = Cow::Owned(ret);
+                Ok(owned)
             }
         }
     }
