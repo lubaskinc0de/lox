@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use crate::{
     environment::Environment,
     error::InterpreterError,
+    operator::{calc, cmp, eq, unary},
     parser::Expr,
     scanner::{Literal, Token, TokenType},
     stmt::Stmt,
@@ -15,21 +16,23 @@ pub struct Interpreter<'a> {
 impl<'a> Interpreter<'a> {
     pub fn interpret(&mut self, program: &'a [Stmt]) -> Result<(), InterpreterError> {
         Ok(for stmt in program {
-            self.execute(stmt)?;
+            self.execute_statement(stmt)?;
         })
     }
-    fn execute(&mut self, stmt: &'a Stmt) -> Result<(), InterpreterError> {
+
+    fn execute_statement(&mut self, stmt: &'a Stmt) -> Result<(), InterpreterError> {
         match stmt {
-            Stmt::Expression(expr) => self.evaluate(expr).map(|_| {}),
+            Stmt::Expression(expr) => self.eval(expr).map(|_| {}),
             Stmt::Print(expr) => {
-                let evaluated = self.evaluate(expr)?;
-                Ok(Interpreter::execute_print(evaluated.as_ref()))
+                let evaluated = self.eval(expr)?;
+                Ok(Interpreter::print(evaluated.as_ref()))
             }
-            Stmt::VarDeclaration { expr, name } => self.execute_var(expr, name),
+            Stmt::VarDeclaration { expr, name } => self.declare_variable(expr, name),
         }?;
         Ok(())
     }
-    fn execute_print(val: &Literal) {
+
+    fn print(val: &Literal) {
         match val {
             Literal::IDENTIFIER(val) => println!("{}", val),
             Literal::STRING(val) => println!("{}", val),
@@ -38,7 +41,8 @@ impl<'a> Interpreter<'a> {
             Literal::NIL => println!("nil"),
         }
     }
-    fn execute_var(
+
+    fn declare_variable(
         &mut self,
         expr: &'a Option<Expr>,
         name: &Token,
@@ -46,7 +50,7 @@ impl<'a> Interpreter<'a> {
         let mut right: Option<Literal> = None;
 
         if let Some(t_expr) = expr {
-            let evaluated = self.evaluate(t_expr)?;
+            let evaluated = self.eval(t_expr)?;
             right = Some(evaluated.into_owned());
         }
 
@@ -56,13 +60,13 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn evaluate<'b>(&'b mut self, expr: &'a Expr) -> Result<Cow<'b, Literal>, InterpreterError> {
+    fn eval<'b>(&'b mut self, expr: &'a Expr) -> Result<Cow<'b, Literal>, InterpreterError> {
         match expr {
             Expr::Literal(val) => Ok(Cow::Borrowed(val)),
-            Expr::Grouping(expr) => self.evaluate(&expr),
+            Expr::Grouping(expr) => self.eval(&expr),
             Expr::Unary { right, op } => {
-                let evaluated = self.evaluate(&right)?;
-                let lit = Interpreter::evaluate_unary(&op.token_type, evaluated.as_ref(), op.line)?;
+                let evaluated = self.eval(&right)?;
+                let lit = unary(&op.token_type, evaluated.as_ref(), op.line)?;
                 Ok(Cow::Owned(lit))
             }
             Expr::Binary { left, op, right } => match op.token_type {
@@ -71,7 +75,7 @@ impl<'a> Interpreter<'a> {
                 | TokenType::STAR
                 | TokenType::SLASH
                 | TokenType::Pow => {
-                    let rhs = self.evaluate(&right)?;
+                    let rhs = self.eval(&right)?;
                     let l;
                     let r;
 
@@ -86,7 +90,7 @@ impl<'a> Interpreter<'a> {
                         });
                     }
 
-                    let lhs = self.evaluate(&left)?;
+                    let lhs = self.eval(&left)?;
                     if let Literal::NUMBER(left_val) = lhs.as_ref() {
                         l = *left_val;
                     } else {
@@ -98,14 +102,14 @@ impl<'a> Interpreter<'a> {
                         });
                     }
 
-                    let lit = Interpreter::evaluate_arithmetic(&op.token_type, &l, &r, op.line)?;
+                    let lit = calc(&op.token_type, &l, &r, op.line)?;
                     Ok(Cow::Owned(lit))
                 }
                 TokenType::LESS
                 | TokenType::GREATER
                 | TokenType::LessEqual
                 | TokenType::GreaterEqual => {
-                    let rhs = self.evaluate(&right)?;
+                    let rhs = self.eval(&right)?;
                     let l;
                     let r;
 
@@ -120,7 +124,7 @@ impl<'a> Interpreter<'a> {
                         });
                     }
 
-                    let lhs = self.evaluate(&left)?;
+                    let lhs = self.eval(&left)?;
                     if let Literal::NUMBER(left_val) = lhs.as_ref() {
                         l = *left_val;
                     } else {
@@ -132,23 +136,13 @@ impl<'a> Interpreter<'a> {
                         });
                     }
 
-                    let lit = Interpreter::evaluate_comparison(
-                        &op.token_type,
-                        &l,
-                        &r,
-                        op.line,
-                    )?;
+                    let lit = cmp(&op.token_type, &l, &r, op.line)?;
                     Ok(Cow::Owned(lit))
                 }
                 TokenType::BangEqual | TokenType::EqualEqual => {
-                    let rhs = self.evaluate(&right)?.into_owned();
-                    let lhs = self.evaluate(&left)?;
-                    let lit = Interpreter::evaluate_equality(
-                        &op.token_type,
-                        lhs.as_ref(),
-                        &rhs,
-                        op.line,
-                    )?;
+                    let rhs = self.eval(&right)?.into_owned();
+                    let lhs = self.eval(&left)?;
+                    let lit = eq(&op.token_type, lhs.as_ref(), &rhs, op.line)?;
                     Ok(Cow::Owned(lit))
                 }
                 _ => Err(InterpreterError::Runtime {
@@ -163,129 +157,11 @@ impl<'a> Interpreter<'a> {
                 Ok(Cow::Borrowed(var))
             }
             Expr::Assign { name, value } => {
-                let evaluated = self.evaluate(&value)?;
+                let evaluated = self.eval(&value)?;
                 let scalar = Some(evaluated.into_owned());
                 let ret = self.env.assign(name, scalar)?;
                 Ok(Cow::Owned(ret.clone()))
             }
-        }
-    }
-
-    fn evaluate_unary(
-        op: &TokenType,
-        right: &Literal,
-        line: usize,
-    ) -> Result<Literal, InterpreterError> {
-        match op {
-            TokenType::MINUS => match right {
-                Literal::NUMBER(number) => Ok(Literal::NUMBER(-number)),
-                _ => Err(InterpreterError::Runtime {
-                    message: "Cannot apply minus to non-number".to_string(),
-                    token: None,
-                    line,
-                    hint: "Ensure the operand is a number".to_string(),
-                }),
-            },
-            TokenType::BANG => Ok(Literal::BOOL(!right.is_truthy())),
-            _ => Err(InterpreterError::Runtime {
-                message: "Unhandled operator".to_string(),
-                token: None,
-                line,
-                hint: "Check the operator and try again".to_string(),
-            }),
-        }
-    }
-
-    fn evaluate_arithmetic(
-        op: &TokenType,
-        left: &f64,
-        right: &f64,
-        line: usize,
-    ) -> Result<Literal, InterpreterError> {
-        match op {
-            TokenType::MINUS => Ok(Literal::NUMBER(left - right)),
-            TokenType::PLUS => Ok(Literal::NUMBER(left + right)),
-            TokenType::STAR => Ok(Literal::NUMBER(left * right)),
-            TokenType::Pow => Ok(Literal::NUMBER(left.powf(*right))),
-            TokenType::SLASH => {
-                if *right == 0.0 {
-                    Err(InterpreterError::Runtime {
-                        message: "Division by zero".to_string(),
-                        token: None,
-                        line,
-                        hint: "Ensure the divisor is not zero".to_string(),
-                    })
-                } else {
-                    Ok(Literal::NUMBER(left / right))
-                }
-            }
-            _ => Err(InterpreterError::Runtime {
-                message: "Unsupported arithmetic operator".to_string(),
-                token: None,
-                line,
-                hint: "Check the operator and try again".to_string(),
-            }),
-        }
-    }
-
-    fn evaluate_comparison(
-        op: &TokenType,
-        left: &f64,
-        right: &f64,
-        line: usize,
-    ) -> Result<Literal, InterpreterError> {
-        match op {
-            TokenType::LESS => Ok(Literal::BOOL(left < right)),
-            TokenType::GREATER => Ok(Literal::BOOL(left > right)),
-            TokenType::LessEqual => Ok(Literal::BOOL(left <= right)),
-            TokenType::GreaterEqual => Ok(Literal::BOOL(left >= right)),
-            _ => Err(InterpreterError::Runtime {
-                message: "Unsupported comparison operator".to_string(),
-                token: None,
-                line,
-                hint: "Check the operator and try again".to_string(),
-            }),
-        }
-    }
-
-    fn evaluate_equality(
-        op: &TokenType,
-        left: &Literal,
-        right: &Literal,
-        line: usize,
-    ) -> Result<Literal, InterpreterError> {
-        match (left, right) {
-            (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) => match op {
-                TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
-                TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
-                _ => Err(InterpreterError::Runtime {
-                    message: "Unsupported equality operator".to_string(),
-                    token: None,
-                    line,
-                    hint: "Check the operator and try again".to_string(),
-                }),
-            },
-            (Literal::STRING(left_val), Literal::STRING(right_val)) => match op {
-                TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
-                TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
-                _ => Err(InterpreterError::Runtime {
-                    message: "Unsupported equality operator".to_string(),
-                    token: None,
-                    line,
-                    hint: "Check the operator and try again".to_string(),
-                }),
-            },
-            (Literal::BOOL(left_val), Literal::BOOL(right_val)) => match op {
-                TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
-                TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
-                _ => Err(InterpreterError::Runtime {
-                    message: "Unsupported equality operator".to_string(),
-                    token: None,
-                    line,
-                    hint: "Check the operator and try again".to_string(),
-                }),
-            },
-            _ => Ok(Literal::BOOL(false)),
         }
     }
 }

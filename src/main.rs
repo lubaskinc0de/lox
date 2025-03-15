@@ -15,6 +15,7 @@ mod interpreter;
 mod parser;
 mod scanner;
 mod stmt;
+mod operator;
 
 fn read_file_to_string(file_name: &str) -> String {
     let mut buf = String::new();
