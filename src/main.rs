@@ -30,13 +30,13 @@ fn run_file(file_name: &str) {
     let source: String = read_file_to_string(&file_name);
     let mut env = Environment {
         values: HashMap::new(),
+        enclosing: None,
     };
     run(&source, &mut env, true);
 }
 
 fn run(line: &str, env: &mut Environment, do_panic: bool) {
     let mut scanner = Scanner::new(line);
-    let mut interpreter = Interpreter {};
     let tokens = match scanner.scan_tokens() {
         Ok(v) => v,
         Err(e) => {
@@ -62,7 +62,7 @@ fn run(line: &str, env: &mut Environment, do_panic: bool) {
         }
     };
 
-    match interpreter.interpret(&statements, env) {
+    match Interpreter::interpret(&statements, env) {
         Ok(v) => v,
         Err(e) => {
             if do_panic {
@@ -80,6 +80,7 @@ fn run_prompt() {
     let mut input = String::new();
     let mut env = Environment {
         values: HashMap::new(),
+        enclosing: None,
     };
     loop {
         input.clear();
