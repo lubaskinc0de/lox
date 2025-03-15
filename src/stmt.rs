@@ -8,4 +8,5 @@ pub enum Stmt<'a> {
         expr: Option<Expr<'a>>,
         name: &'a Token,
     },
+    Block(Vec<Stmt<'a>>),
 }

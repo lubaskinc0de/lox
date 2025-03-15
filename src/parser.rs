@@ -97,6 +97,10 @@ impl<'a> Parser<'a> {
             return self.print_stmt();
         }
 
+        if self.matches(&[TokenType::LeftBrace]) {
+            return self.block_stmt();
+        }
+
         self.expression_stmt()
     }
 
@@ -122,6 +126,27 @@ impl<'a> Parser<'a> {
         let expr = self.expression()?;
         self.expect_semicolon()?;
         return Ok(Stmt::Expression(expr));
+    }
+
+    fn block_stmt(&self) -> Result<Stmt, InterpreterError> {
+        let mut code: Vec<Stmt> = vec![];
+
+        while !self.check(TokenType::RightBrace) {
+            code.push(self.declaration()?);
+        }
+
+        let consumed = self.consume(TokenType::RightBrace);
+        let p = self.peek();
+        let l = p.line;
+        if consumed.is_none() {
+            return Err(InterpreterError::Parser {
+                message: "Expected '}'".to_string(),
+                token: p.clone(),
+                line: l,
+            });
+        }
+
+        Ok(Stmt::Block(code))
     }
 
     fn expression(&self) -> Result<Expr, InterpreterError> {

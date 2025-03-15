@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use crate::{
     environment::Environment,
@@ -14,23 +14,34 @@ pub struct Interpreter {}
 impl<'a> Interpreter {
     pub fn interpret(
         program: &'a [Stmt],
-        globals: &'a mut Environment,
-    ) -> Result<(), InterpreterError> {
-        Ok(for stmt in program {
-            Interpreter::execute_statement(stmt, globals)?;
-        })
+        mut globals: Rc<RefCell<Environment>>,
+    ) -> Result<Rc<RefCell<Environment>>, InterpreterError> {
+        for stmt in program {
+            globals = Interpreter::execute_statement(stmt, globals)?;
+        }
+        Ok(globals)
     }
 
-    fn execute_statement(stmt: &'a Stmt, env: &'a mut Environment) -> Result<(), InterpreterError> {
+    fn execute_statement(
+        stmt: &'a Stmt,
+        mut env: Rc<RefCell<Environment>>,
+    ) -> Result<Rc<RefCell<Environment>>, InterpreterError> {
         match stmt {
-            Stmt::Expression(expr) => Interpreter::eval(expr, env).map(|_| {}),
+            Stmt::Expression(expr) => Interpreter::eval(expr, &mut env.borrow_mut()).map(|_| {}),
             Stmt::Print(expr) => {
-                let evaluated = Interpreter::eval(expr, env)?;
+                let mut e = env.borrow_mut();
+                let evaluated = Interpreter::eval(expr, &mut e)?;
                 Ok(Interpreter::print(evaluated.as_ref()))
             }
-            Stmt::VarDeclaration { expr, name } => Interpreter::declare_variable(expr, name, env),
+            Stmt::VarDeclaration { expr, name } => {
+                Interpreter::declare_variable(expr, name, &mut env.borrow_mut())
+            }
+            Stmt::Block(code) => {
+                env = Interpreter::block(code, env)?;
+                Ok(())
+            }
         }?;
-        Ok(())
+        Ok(env)
     }
 
     fn print(val: &Literal) {
@@ -57,6 +68,15 @@ impl<'a> Interpreter {
 
         env.define(name, right)?;
         Ok(())
+    }
+
+    fn block(
+        code: &[Stmt],
+        outer: Rc<RefCell<Environment>>,
+    ) -> Result<Rc<RefCell<Environment>>, InterpreterError> {
+        let env = Environment::new(Some(Rc::clone(&outer)));
+        Interpreter::interpret(code, Rc::new(RefCell::new(env)))?;
+        Ok(outer)
     }
 
     fn eval(

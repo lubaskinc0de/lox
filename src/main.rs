@@ -1,6 +1,8 @@
 use std::{
+    cell::RefCell,
     fs::File,
     io::{self, Read},
+    rc::Rc,
 };
 
 use clap::Parser as CliParser;
@@ -27,11 +29,11 @@ fn read_file_to_string(file_name: &str) -> String {
 
 fn run_file(file_name: &str) {
     let source: String = read_file_to_string(&file_name);
-    let mut env = Environment::new(None);
-    run(&source, &mut env, true);
+    let env = Environment::new(None);
+    run(&source, Rc::new(RefCell::new(env)), true);
 }
 
-fn run(line: &str, env: &mut Environment, do_panic: bool) {
+fn run(line: &str, mut env: Rc<RefCell<Environment>>, do_panic: bool) -> Rc<RefCell<Environment>> {
     let mut scanner = Scanner::new(line);
 
     let tokens = match scanner.scan_tokens() {
@@ -41,7 +43,7 @@ fn run(line: &str, env: &mut Environment, do_panic: bool) {
                 panic!("{}", e)
             } else {
                 println!("{}", e);
-                return;
+                return env;
             }
         }
     };
@@ -54,28 +56,29 @@ fn run(line: &str, env: &mut Environment, do_panic: bool) {
                 panic!("{}", e)
             } else {
                 println!("{}", e);
-                return;
+                return env;
             }
         }
     };
 
-    match Interpreter::interpret(&statements, env) {
+    env = match Interpreter::interpret(&statements, Rc::clone(&env)) {
         Ok(v) => v,
         Err(e) => {
             if do_panic {
                 panic!("{}", e)
             } else {
                 println!("{}", e);
-                return;
+                return env;
             }
         }
     };
+    env
 }
 
 fn run_prompt() {
     println!("RLox REPL:");
     let mut input = String::new();
-    let mut env = Environment::new(None);
+    let mut env = Rc::new(RefCell::new(Environment::new(None)));
     loop {
         input.clear();
         eprint!("> ");
@@ -87,7 +90,7 @@ fn run_prompt() {
             break;
         }
 
-        run(&input, &mut env, false);
+        env = run(&input, env, false);
     }
 }
 
