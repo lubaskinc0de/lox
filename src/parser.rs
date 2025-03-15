@@ -102,13 +102,12 @@ impl<'a> Parser<'a> {
 
     fn expect_semicolon(&self) -> Result<&Token, InterpreterError> {
         let token = self.peek();
-        let token_clone = token.clone();
         let line = token.line;
 
         self.consume(TokenType::SEMICOLON)
             .ok_or(InterpreterError::Parser {
                 message: "Expected ';' after expression".to_string(),
-                token: token_clone,
+                token: token.clone(),
                 line,
             })
     }
@@ -260,8 +259,7 @@ impl<'a> Parser<'a> {
 
         let is_left_paren = self.matches(&[TokenType::LeftParen]);
         let peek = self.peek();
-        let peek_clone = peek.clone();
-        let line = peek_clone.line;
+        let line = peek.line;
 
         if is_left_paren {
             let expr = self.expression()?;
@@ -270,7 +268,7 @@ impl<'a> Parser<'a> {
             if consumed.is_none() {
                 return Err(InterpreterError::Parser {
                     message: String::from("Expect ')' after expression."),
-                    token: peek_clone,
+                    token: peek.clone(),
                     line: line,
                 });
             }
@@ -279,7 +277,7 @@ impl<'a> Parser<'a> {
 
         Err(InterpreterError::Parser {
             message: String::from("Expected expression"),
-            token: peek_clone,
+            token: peek.clone(),
             line: line,
         })
     }
