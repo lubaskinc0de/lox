@@ -9,25 +9,31 @@ use crate::{
     stmt::Stmt,
 };
 
-pub struct Interpreter<'a> {
-    pub env: &'a mut Environment,
-}
+pub struct Interpreter {}
 
-impl<'a> Interpreter<'a> {
-    pub fn interpret(&mut self, program: &'a [Stmt]) -> Result<(), InterpreterError> {
+impl<'a> Interpreter {
+    pub fn interpret(
+        &'a mut self,
+        program: &'a [Stmt],
+        globals: &'a mut Environment,
+    ) -> Result<(), InterpreterError> {
         Ok(for stmt in program {
-            self.execute_statement(stmt)?;
+            self.execute_statement(stmt, globals)?;
         })
     }
 
-    fn execute_statement(&mut self, stmt: &'a Stmt) -> Result<(), InterpreterError> {
+    fn execute_statement(
+        &mut self,
+        stmt: &'a Stmt,
+        env: &'a mut Environment,
+    ) -> Result<(), InterpreterError> {
         match stmt {
-            Stmt::Expression(expr) => self.eval(expr).map(|_| {}),
+            Stmt::Expression(expr) => Interpreter::eval(expr, env).map(|_| {}),
             Stmt::Print(expr) => {
-                let evaluated = self.eval(expr)?;
+                let evaluated = Interpreter::eval(expr, env)?;
                 Ok(Interpreter::print(evaluated.as_ref()))
             }
-            Stmt::VarDeclaration { expr, name } => self.declare_variable(expr, name),
+            Stmt::VarDeclaration { expr, name } => self.declare_variable(expr, name, env),
         }?;
         Ok(())
     }
@@ -46,26 +52,30 @@ impl<'a> Interpreter<'a> {
         &mut self,
         expr: &'a Option<Expr>,
         name: &Token,
+        env: &'a mut Environment,
     ) -> Result<(), InterpreterError> {
         let mut right: Option<Literal> = None;
 
         if let Some(t_expr) = expr {
-            let evaluated = self.eval(t_expr)?;
+            let evaluated = Interpreter::eval(t_expr, env)?;
             right = Some(evaluated.into_owned());
         }
 
         let identifier = name.expect_identifier()?;
-        self.env.define(identifier, right)?;
+        env.define(identifier, right)?;
 
         Ok(())
     }
 
-    fn eval<'b>(&'b mut self, expr: &'a Expr) -> Result<Cow<'b, Literal>, InterpreterError> {
+    fn eval(
+        expr: &'a Expr,
+        env: &'a mut Environment,
+    ) -> Result<Cow<'a, Literal>, InterpreterError> {
         match expr {
             Expr::Literal(val) => Ok(Cow::Borrowed(val)),
-            Expr::Grouping(expr) => self.eval(&expr),
+            Expr::Grouping(expr) => Interpreter::eval(&expr, env),
             Expr::Unary { right, op } => {
-                let evaluated = self.eval(&right)?;
+                let evaluated = Interpreter::eval(&right, env)?;
                 let lit = unary(&op.token_type, evaluated.as_ref(), op.line)?;
                 Ok(Cow::Owned(lit))
             }
@@ -75,7 +85,7 @@ impl<'a> Interpreter<'a> {
                 | TokenType::STAR
                 | TokenType::SLASH
                 | TokenType::Pow => {
-                    let rhs = self.eval(&right)?;
+                    let rhs = Interpreter::eval(&right, env)?;
                     let l;
                     let r;
 
@@ -90,7 +100,7 @@ impl<'a> Interpreter<'a> {
                         });
                     }
 
-                    let lhs = self.eval(&left)?;
+                    let lhs = Interpreter::eval(&left, env)?;
                     if let Literal::NUMBER(left_val) = lhs.as_ref() {
                         l = *left_val;
                     } else {
@@ -109,7 +119,7 @@ impl<'a> Interpreter<'a> {
                 | TokenType::GREATER
                 | TokenType::LessEqual
                 | TokenType::GreaterEqual => {
-                    let rhs = self.eval(&right)?;
+                    let rhs = Interpreter::eval(&right, env)?;
                     let l;
                     let r;
 
@@ -124,7 +134,7 @@ impl<'a> Interpreter<'a> {
                         });
                     }
 
-                    let lhs = self.eval(&left)?;
+                    let lhs = Interpreter::eval(&left, env)?;
                     if let Literal::NUMBER(left_val) = lhs.as_ref() {
                         l = *left_val;
                     } else {
@@ -140,8 +150,8 @@ impl<'a> Interpreter<'a> {
                     Ok(Cow::Owned(lit))
                 }
                 TokenType::BangEqual | TokenType::EqualEqual => {
-                    let rhs = self.eval(&right)?.into_owned();
-                    let lhs = self.eval(&left)?;
+                    let rhs = Interpreter::eval(&right, env)?.into_owned();
+                    let lhs = Interpreter::eval(&left, env)?;
                     let lit = eq(&op.token_type, lhs.as_ref(), &rhs, op.line)?;
                     Ok(Cow::Owned(lit))
                 }
@@ -153,13 +163,13 @@ impl<'a> Interpreter<'a> {
                 }),
             },
             Expr::VarRead(token) => {
-                let var = self.env.get(&token)?;
+                let var = env.get(&token)?;
                 Ok(Cow::Borrowed(var))
             }
             Expr::Assign { name, value } => {
-                let evaluated = self.eval(&value)?;
+                let evaluated = Interpreter::eval(&value, env)?;
                 let scalar = Some(evaluated.into_owned());
-                let ret = self.env.assign(name, scalar)?;
+                let ret = env.assign(name, scalar)?;
                 Ok(Cow::Owned(ret.clone()))
             }
         }
