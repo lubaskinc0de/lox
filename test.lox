@@ -1,2 +1,6 @@
-print "hello";
-print "world";
+var a = 1;
+{
+    print a;
+    a = 2;
+}
+print a;
