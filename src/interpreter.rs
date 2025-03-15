@@ -13,17 +13,15 @@ pub struct Interpreter {}
 
 impl<'a> Interpreter {
     pub fn interpret(
-        &'a mut self,
         program: &'a [Stmt],
         globals: &'a mut Environment,
     ) -> Result<(), InterpreterError> {
         Ok(for stmt in program {
-            self.execute_statement(stmt, globals)?;
+            Interpreter::execute_statement(stmt, globals)?;
         })
     }
 
     fn execute_statement(
-        &mut self,
         stmt: &'a Stmt,
         env: &'a mut Environment,
     ) -> Result<(), InterpreterError> {
@@ -33,7 +31,7 @@ impl<'a> Interpreter {
                 let evaluated = Interpreter::eval(expr, env)?;
                 Ok(Interpreter::print(evaluated.as_ref()))
             }
-            Stmt::VarDeclaration { expr, name } => self.declare_variable(expr, name, env),
+            Stmt::VarDeclaration { expr, name } => Interpreter::declare_variable(expr, name, env),
         }?;
         Ok(())
     }
@@ -49,7 +47,6 @@ impl<'a> Interpreter {
     }
 
     fn declare_variable(
-        &mut self,
         expr: &'a Option<Expr>,
         name: &Token,
         env: &'a mut Environment,
