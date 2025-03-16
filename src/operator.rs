@@ -1,6 +1,8 @@
+use std::borrow::Cow;
+
 use crate::{
     error::InterpreterError,
-    scanner::{Literal, TokenType},
+    scanner::{Literal, Token, TokenType},
 };
 
 pub fn unary(op: &TokenType, right: &Literal, line: usize) -> Result<Literal, InterpreterError> {
@@ -114,5 +116,29 @@ pub fn eq(
             }),
         },
         _ => Ok(Literal::BOOL(false)),
+    }
+}
+
+pub fn logical<'a>(
+    left: Cow<'a, Literal>,
+    right: Cow<'a, Literal>,
+    op: &Token,
+) -> Result<Cow<'a, Literal>, InterpreterError> {
+    match op.token_type {
+        TokenType::OR => {
+            if left.is_truthy() {
+                Ok(left)
+            } else {
+                Ok(right)
+            }
+        }
+        TokenType::AND => {
+            if !left.is_truthy() {
+                Ok(left)
+            } else {
+                Ok(right)
+            }
+        }
+        _ => panic!("Runtime: Invalid logical op: {}", op),
     }
 }

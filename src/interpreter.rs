@@ -3,7 +3,7 @@ use std::{borrow::Cow, cell::RefCell, rc::Rc};
 use crate::{
     environment::Environment,
     error::InterpreterError,
-    operator::{calc, cmp, eq, unary},
+    operator::{calc, cmp, eq, logical, unary},
     parser::Expr,
     scanner::{Literal, Token, TokenType},
     stmt::Stmt,
@@ -14,18 +14,18 @@ pub struct Interpreter {}
 impl<'a> Interpreter {
     pub fn interpret(
         program: &'a [Stmt],
-        mut globals: Rc<RefCell<Environment>>,
-    ) -> Result<Rc<RefCell<Environment>>, InterpreterError> {
+        globals: Rc<RefCell<Environment>>,
+    ) -> Result<(), InterpreterError> {
         for stmt in program {
-            globals = Interpreter::execute_statement(stmt, globals)?;
+            Interpreter::execute_statement(stmt, Rc::clone(&globals))?;
         }
-        Ok(globals)
+        Ok(())
     }
 
     fn execute_statement(
         stmt: &'a Stmt,
-        mut env: Rc<RefCell<Environment>>,
-    ) -> Result<Rc<RefCell<Environment>>, InterpreterError> {
+        env: Rc<RefCell<Environment>>,
+    ) -> Result<(), InterpreterError> {
         match stmt {
             Stmt::Expression(expr) => Interpreter::eval(expr, &mut env.borrow_mut()).map(|_| {}),
             Stmt::Print(expr) => {
@@ -37,16 +37,16 @@ impl<'a> Interpreter {
                 Interpreter::declare_variable(expr, name, &mut env.borrow_mut())
             }
             Stmt::Block(code) => {
-                env = Interpreter::block(code, env)?;
+                Interpreter::block(code, env)?;
                 Ok(())
             }
             Stmt::If { cond, then, else_ } => {
                 let e_stmt = (*else_).as_deref();
-                env = Interpreter::if_(cond, then, e_stmt, env)?;
+                Interpreter::if_(cond, then, e_stmt, env)?;
                 Ok(())
             }
         }?;
-        Ok(env)
+        Ok(())
     }
 
     fn print(val: &Literal) {
@@ -75,13 +75,10 @@ impl<'a> Interpreter {
         Ok(())
     }
 
-    fn block(
-        code: &[Stmt],
-        outer: Rc<RefCell<Environment>>,
-    ) -> Result<Rc<RefCell<Environment>>, InterpreterError> {
+    fn block(code: &[Stmt], outer: Rc<RefCell<Environment>>) -> Result<(), InterpreterError> {
         let env = Environment::new(Some(Rc::clone(&outer)));
         Interpreter::interpret(code, Rc::new(RefCell::new(env)))?;
-        Ok(outer)
+        Ok(())
     }
 
     fn if_(
@@ -89,17 +86,19 @@ impl<'a> Interpreter {
         then: &Stmt<'a>,
         else_: Option<&Stmt<'a>>,
         env: Rc<RefCell<Environment>>,
-    ) -> Result<Rc<RefCell<Environment>>, InterpreterError> {
-        let mut env_mut = env.borrow_mut();
-        let cond_eval = Interpreter::eval(cond, &mut env_mut)?;
-        if cond_eval.is_truthy() {
-            Interpreter::execute_statement(then, Rc::clone(&env))?;
-        } else if else_.is_some() {
-            let u = else_.unwrap();
-            Interpreter::execute_statement(&u, Rc::clone(&env))?;
+    ) -> Result<(), InterpreterError> {
+        {
+            let mut env_mut = env.borrow_mut();
+            let cond_eval = Interpreter::eval(cond, &mut env_mut)?;
+            if cond_eval.is_truthy() {
+                drop(env_mut);
+                Interpreter::execute_statement(then, Rc::clone(&env))?;
+            } else if let Some(else_stmt) = else_ {
+                drop(env_mut);
+                Interpreter::execute_statement(else_stmt, Rc::clone(&env))?;
+            }
         }
-        drop(env_mut);
-        Ok(env)
+        Ok(())
     }
 
     fn eval(
@@ -197,6 +196,12 @@ impl<'a> Interpreter {
                     hint: "Check the operator and try again".to_string(),
                 }),
             },
+            Expr::Logical { left, op, right } => {
+                let left_lit = Interpreter::eval(&left, env)?.into_owned();
+                let right_lit = Interpreter::eval(&right, env)?;
+                let lit = logical(Cow::Owned(left_lit), right_lit, op)?;
+                Ok(lit)
+            }
             Expr::VarRead(token) => {
                 let var = env.get(&token)?;
                 Ok(var)

@@ -33,7 +33,7 @@ fn run_file(file_name: &str) {
     run(&source, Rc::new(RefCell::new(env)), true);
 }
 
-fn run(line: &str, mut env: Rc<RefCell<Environment>>, do_panic: bool) -> Rc<RefCell<Environment>> {
+fn run(line: &str, env: Rc<RefCell<Environment>>, do_panic: bool) {
     let mut scanner = Scanner::new(line);
 
     let tokens = match scanner.scan_tokens() {
@@ -43,7 +43,7 @@ fn run(line: &str, mut env: Rc<RefCell<Environment>>, do_panic: bool) -> Rc<RefC
                 panic!("{}", e)
             } else {
                 println!("{}", e);
-                return env;
+                return
             }
         }
     };
@@ -56,29 +56,27 @@ fn run(line: &str, mut env: Rc<RefCell<Environment>>, do_panic: bool) -> Rc<RefC
                 panic!("{}", e)
             } else {
                 println!("{}", e);
-                return env;
+                return
             }
         }
     };
 
-    env = match Interpreter::interpret(&statements, Rc::clone(&env)) {
-        Ok(v) => v,
+    match Interpreter::interpret(&statements, Rc::clone(&env)) {
+        Ok(_) => {},
         Err(e) => {
             if do_panic {
                 panic!("{}", e)
             } else {
                 println!("{}", e);
-                return env;
             }
         }
     };
-    env
 }
 
 fn run_prompt() {
     println!("RLox REPL:");
     let mut input = String::new();
-    let mut env = Rc::new(RefCell::new(Environment::new(None)));
+    let env = Rc::new(RefCell::new(Environment::new(None)));
     loop {
         input.clear();
         eprint!("> ");
@@ -90,7 +88,7 @@ fn run_prompt() {
             break;
         }
 
-        env = run(&input, env, false);
+        run(&input, Rc::clone(&env), false);
     }
 }
 

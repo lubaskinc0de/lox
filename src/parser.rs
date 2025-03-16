@@ -14,6 +14,11 @@ pub enum Expr<'a> {
         op: &'a Token,
         right: Box<Expr<'a>>,
     },
+    Logical {
+        left: Box<Expr<'a>>,
+        op: &'a Token,
+        right: Box<Expr<'a>>,
+    },
     Unary {
         right: Box<Expr<'a>>,
         op: &'a Token,
@@ -193,7 +198,7 @@ impl<'a> Parser<'a> {
     }
 
     fn assignment(&self) -> Result<Expr, InterpreterError> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.matches(&[TokenType::EQUAL]) {
             let equals = self.prev();
@@ -211,6 +216,38 @@ impl<'a> Parser<'a> {
                 }),
             };
         }
+        Ok(expr)
+    }
+
+    fn or(&self) -> Result<Expr, InterpreterError> {
+        let mut expr = self.and()?;
+
+        while self.matches(&[TokenType::OR]) {
+            let op = self.prev();
+            let right = self.and()?;
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                op: op,
+                right: Box::new(right),
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&self) -> Result<Expr, InterpreterError> {
+        let mut expr = self.equality()?;
+
+        while self.matches(&[TokenType::AND]) {
+            let op = self.prev();
+            let right = self.equality()?;
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                op: op,
+                right: Box::new(right),
+            }
+        }
+
         Ok(expr)
     }
 
