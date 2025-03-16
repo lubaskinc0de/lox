@@ -49,7 +49,7 @@ impl<'a> Parser<'a> {
             if self.is_at_end() {
                 break;
             }
-            let decl = self.declaration().map_err(|err| InterpreterError::Stack {
+            let decl = self.statement().map_err(|err| InterpreterError::Stack {
                 stack: vec![Rc::new(err)],
             })?;
 
@@ -58,47 +58,21 @@ impl<'a> Parser<'a> {
         Ok(stmts)
     }
 
-    fn declaration(&self) -> Result<Stmt, InterpreterError> {
-        if self.matches(&[TokenType::VAR]) {
-            return self.var_declaration();
-        }
-
-        self.statement()
-    }
-
-    fn var_declaration(&self) -> Result<Stmt, InterpreterError> {
-        let token = self.peek();
-        let line = token.line;
-
-        let consumed = self.consume(TokenType::IDENTIFIER);
-        let variable_token = consumed.ok_or(InterpreterError::Parser {
-            message: "Expected name after variable declaration".to_string(),
-            token: token.clone(),
-            line,
-        })?;
-
-        variable_token.expect_identifier()?;
-
-        let mut variable_expr: Option<Expr> = None;
-        let matches_eq = self.matches(&[TokenType::EQUAL]);
-        if matches_eq {
-            variable_expr = Some(self.expression()?);
-        }
-
-        self.expect_semicolon()?;
-        return Ok(Stmt::VarDeclaration {
-            expr: variable_expr,
-            name: variable_token,
-        });
-    }
-
     fn statement(&self) -> Result<Stmt, InterpreterError> {
+        if self.matches(&[TokenType::VAR]) {
+            return self.var_stmt();
+        }
+
         if self.matches(&[TokenType::PRINT]) {
             return self.print_stmt();
         }
 
         if self.matches(&[TokenType::LeftBrace]) {
             return self.block_stmt();
+        }
+
+        if self.matches(&[TokenType::IF]) {
+            return self.if_stmt();
         }
 
         self.expression_stmt()
@@ -132,7 +106,7 @@ impl<'a> Parser<'a> {
         let mut code: Vec<Stmt> = vec![];
 
         while !self.check(TokenType::RightBrace) {
-            code.push(self.declaration()?);
+            code.push(self.statement()?);
         }
 
         let consumed = self.consume(TokenType::RightBrace);
@@ -147,6 +121,71 @@ impl<'a> Parser<'a> {
         }
 
         Ok(Stmt::Block(code))
+    }
+
+    fn var_stmt(&self) -> Result<Stmt, InterpreterError> {
+        let token = self.peek();
+        let line = token.line;
+
+        let consumed = self.consume(TokenType::IDENTIFIER);
+        let variable_token = consumed.ok_or(InterpreterError::Parser {
+            message: "Expected name after variable declaration".to_string(),
+            token: token.clone(),
+            line,
+        })?;
+
+        variable_token.expect_identifier()?;
+
+        let mut variable_expr: Option<Expr> = None;
+        let matches_eq = self.matches(&[TokenType::EQUAL]);
+        if matches_eq {
+            variable_expr = Some(self.expression()?);
+        }
+
+        self.expect_semicolon()?;
+        return Ok(Stmt::VarDeclaration {
+            expr: variable_expr,
+            name: variable_token,
+        });
+    }
+
+    fn if_stmt(&self) -> Result<Stmt, InterpreterError> {
+        let l_paren = self.consume(TokenType::LeftParen);
+        let mut peek = self.peek();
+        let mut line = peek.line;
+
+        if l_paren.is_none() {
+            return Err(InterpreterError::Parser {
+                message: "Expected '(' after if".to_string(),
+                token: peek.clone(),
+                line,
+            });
+        }
+        let cond = self.expression()?;
+        let r_paren = self.consume(TokenType::RightParen);
+        peek = self.peek();
+        line = peek.line;
+
+        if r_paren.is_none() {
+            return Err(InterpreterError::Parser {
+                message: "Expected ')' after if condition".to_string(),
+                token: peek.clone(),
+                line,
+            });
+        }
+
+        let then_branch = self.statement()?;
+        let mut else_branch: Option<Box<Stmt>> = None;
+
+        if self.matches(&[TokenType::ELSE]) {
+            else_branch = Some(Box::new(self.statement()?));
+        };
+
+        Ok(Stmt::If {
+            cond: cond,
+            then: Box::new(then_branch),
+            else_: else_branch,
+        })
     }
 
     fn expression(&self) -> Result<Expr, InterpreterError> {

@@ -97,9 +97,7 @@ impl fmt::Display for Token {
             write!(
                 f,
                 "[Token {:?}] Lexeme: '{}' -- {:?}",
-                self.token_type,
-                self.lexeme,
-                &self.literal,
+                self.token_type, self.lexeme, &self.literal,
             )
         } else {
             write!(f, "[Token {:?}] Lexeme: '{}'", self.token_type, self.lexeme)
@@ -313,7 +311,7 @@ impl Scanner {
     }
 
     fn char_at(&self, index: usize) -> char {
-        self.source.as_bytes()[index] as char
+        self.source.chars().nth(index).expect(&format!("Out of bounds index: {}", index))
     }
 
     fn advance(&mut self) -> char {
@@ -458,7 +456,10 @@ impl Scanner {
 
         match self.keywords.get(&identifier_value) {
             Some(val) => self.add_token(val.clone(), Some(Literal::IDENTIFIER(identifier_value))),
-            None => self.add_token(TokenType::IDENTIFIER, Some(Literal::IDENTIFIER(identifier_value))),
+            None => self.add_token(
+                TokenType::IDENTIFIER,
+                Some(Literal::IDENTIFIER(identifier_value)),
+            ),
         }
     }
 }

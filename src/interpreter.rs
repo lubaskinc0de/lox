@@ -40,6 +40,11 @@ impl<'a> Interpreter {
                 env = Interpreter::block(code, env)?;
                 Ok(())
             }
+            Stmt::If { cond, then, else_ } => {
+                let e_stmt = (*else_).as_deref();
+                env = Interpreter::if_(cond, then, e_stmt, env)?;
+                Ok(())
+            }
         }?;
         Ok(env)
     }
@@ -77,6 +82,24 @@ impl<'a> Interpreter {
         let env = Environment::new(Some(Rc::clone(&outer)));
         Interpreter::interpret(code, Rc::new(RefCell::new(env)))?;
         Ok(outer)
+    }
+
+    fn if_(
+        cond: &Expr,
+        then: &Stmt<'a>,
+        else_: Option<&Stmt<'a>>,
+        env: Rc<RefCell<Environment>>,
+    ) -> Result<Rc<RefCell<Environment>>, InterpreterError> {
+        let mut env_mut = env.borrow_mut();
+        let cond_eval = Interpreter::eval(cond, &mut env_mut)?;
+        if cond_eval.is_truthy() {
+            Interpreter::execute_statement(then, Rc::clone(&env))?;
+        } else if else_.is_some() {
+            let u = else_.unwrap();
+            Interpreter::execute_statement(&u, Rc::clone(&env))?;
+        }
+        drop(env_mut);
+        Ok(env)
     }
 
     fn eval(

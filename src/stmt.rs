@@ -9,4 +9,9 @@ pub enum Stmt<'a> {
         name: &'a Token,
     },
     Block(Vec<Stmt<'a>>),
+    If {
+        cond: Expr<'a>,
+        then: Box<Stmt<'a>>,
+        else_: Option<Box<Stmt<'a>>>,
+    },
 }

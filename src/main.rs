@@ -47,6 +47,7 @@ fn run(line: &str, mut env: Rc<RefCell<Environment>>, do_panic: bool) -> Rc<RefC
             }
         }
     };
+    println!("{:#?}", tokens);
 
     let parser = Parser::new(&tokens);
     let statements = match parser.parse() {
