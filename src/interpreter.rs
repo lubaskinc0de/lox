@@ -13,7 +13,7 @@ pub struct Interpreter {}
 
 impl<'a> Interpreter {
     pub fn interpret(
-        program: &'a [Stmt],
+        program: &[Stmt],
         globals: Rc<RefCell<Environment>>,
     ) -> Result<(), InterpreterError> {
         for stmt in program {
@@ -23,7 +23,7 @@ impl<'a> Interpreter {
     }
 
     fn execute_statement(
-        stmt: &'a Stmt,
+        stmt: &Stmt,
         env: Rc<RefCell<Environment>>,
     ) -> Result<(), InterpreterError> {
         match stmt {
@@ -60,9 +60,9 @@ impl<'a> Interpreter {
     }
 
     fn declare_variable(
-        expr: &'a Option<Expr>,
+        expr: &Option<Expr>,
         name: &Token,
-        env: &'a mut Environment,
+        env: &mut Environment,
     ) -> Result<(), InterpreterError> {
         let mut right: Option<Literal> = None;
 
@@ -83,8 +83,8 @@ impl<'a> Interpreter {
 
     fn if_(
         cond: &Expr,
-        then: &Stmt<'a>,
-        else_: Option<&Stmt<'a>>,
+        then: &Stmt,
+        else_: Option<&Stmt>,
         env: Rc<RefCell<Environment>>,
     ) -> Result<(), InterpreterError> {
         {
