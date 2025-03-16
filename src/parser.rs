@@ -82,6 +82,9 @@ impl<'a> Parser<'a> {
         if self.matches(&[TokenType::WHILE]) {
             return self.while_stmt();
         }
+        if self.matches(&[TokenType::FOR]) {
+            return self.for_stmt();
+        }
 
         self.expression_stmt()
     }
@@ -227,6 +230,65 @@ impl<'a> Parser<'a> {
             cond: cond,
             body: Box::new(body),
         })
+    }
+
+    fn for_stmt(&self) -> Result<Stmt, InterpreterError> {
+        let l_paren = self.consume(TokenType::LeftParen);
+        let mut peek = self.peek();
+        let mut line = peek.line;
+
+        if l_paren.is_none() {
+            return Err(InterpreterError::Parser {
+                message: "Expected '(' after for".to_string(),
+                token: peek.clone(),
+                line,
+            });
+        }
+
+        let initializer: Option<Stmt>;
+        if self.matches(&[TokenType::VAR]) {
+            initializer = Some(self.var_stmt()?);
+        } else if self.matches(&[TokenType::SEMICOLON]) {
+            initializer = None;
+        } else {
+            initializer = Some(self.expression_stmt()?);
+        }
+
+        let mut condition: Expr = Expr::Literal(&Literal::BOOL(true));
+        if !self.check(TokenType::SEMICOLON) {
+            condition = self.expression()?;
+        }
+        self.expect_semicolon()?;
+
+        let mut increment: Option<Expr> = None;
+        if !self.check(TokenType::RightParen) {
+            increment = Some(self.expression()?);
+        }
+
+        // matching right paren
+        peek = self.peek();
+        line = peek.line;
+
+        self.consume(TokenType::RightParen)
+            .ok_or(InterpreterError::Parser {
+                message: "Expected ')' after for clauses".to_string(),
+                token: peek.clone(),
+                line,
+            })?;
+
+        let mut body = self.statement()?;
+
+        if increment.is_some() {
+            body = Stmt::Block(vec![body, Stmt::Expression(increment.unwrap())])
+        }
+
+        body = Stmt::While { cond: condition, body: Box::new(body) };
+
+        if initializer.is_some() {
+            body = Stmt::Block(vec![initializer.unwrap(), body]);
+        }
+
+        Ok(body)
     }
 
     fn expression(&self) -> Result<Expr, InterpreterError> {

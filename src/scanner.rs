@@ -152,7 +152,7 @@ impl Scanner {
                 (String::from("храм"), TokenType::CLASS),
                 (String::from("пиздишь"), TokenType::ELSE),
                 (String::from("пиздёж"), TokenType::FALSE),
-                (String::from("для"), TokenType::FOR),
+                (String::from("ебашь"), TokenType::FOR),
                 (String::from("молитва"), TokenType::FUN),
                 (String::from("если"), TokenType::IF),
                 (String::from("нихуя"), TokenType::NIL),
