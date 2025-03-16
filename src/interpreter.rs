@@ -11,7 +11,7 @@ use crate::{
 
 pub struct Interpreter {}
 
-impl<'a> Interpreter {
+impl Interpreter {
     pub fn interpret(
         program: &[Stmt],
         globals: Rc<RefCell<Environment>>,
@@ -101,7 +101,7 @@ impl<'a> Interpreter {
         Ok(())
     }
 
-    fn eval(
+    fn eval<'a>(
         expr: &'a Expr,
         env: &'a mut Environment,
     ) -> Result<Cow<'a, Literal>, InterpreterError> {
