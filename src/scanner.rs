@@ -311,7 +311,7 @@ impl Scanner {
     }
 
     fn char_at(&self, index: usize) -> char {
-        self.source.chars().nth(index).expect(&format!("Out of bounds index: {}", index))
+        self.source.chars().nth(index).expect("Scanner: char index out of range")
     }
 
     fn advance(&mut self) -> char {
@@ -340,7 +340,7 @@ impl Scanner {
     }
 
     fn peek_next(&self) -> char {
-        if self.current + 1 >= self.source.len() {
+        if self.current + 1 >= self.source.chars().count() {
             '\0'
         } else {
             self.char_at(self.current + 1)
@@ -348,7 +348,7 @@ impl Scanner {
     }
 
     fn is_at_end(&self) -> bool {
-        self.current >= self.source.len()
+        self.current >= self.source.chars().count()
     }
 
     fn substr(&self, start: usize, end: usize) -> String {
