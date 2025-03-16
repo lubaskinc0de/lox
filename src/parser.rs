@@ -79,6 +79,9 @@ impl<'a> Parser<'a> {
         if self.matches(&[TokenType::IF]) {
             return self.if_stmt();
         }
+        if self.matches(&[TokenType::WHILE]) {
+            return self.while_stmt();
+        }
 
         self.expression_stmt()
     }
@@ -190,6 +193,39 @@ impl<'a> Parser<'a> {
             cond: cond,
             then: Box::new(then_branch),
             else_: else_branch,
+        })
+    }
+
+    fn while_stmt(&self) -> Result<Stmt, InterpreterError> {
+        let l_paren = self.consume(TokenType::LeftParen);
+        let mut peek = self.peek();
+        let mut line = peek.line;
+
+        if l_paren.is_none() {
+            return Err(InterpreterError::Parser {
+                message: "Expected '(' after while".to_string(),
+                token: peek.clone(),
+                line,
+            });
+        }
+        let cond = self.expression()?;
+        let r_paren = self.consume(TokenType::RightParen);
+        peek = self.peek();
+        line = peek.line;
+
+        if r_paren.is_none() {
+            return Err(InterpreterError::Parser {
+                message: "Expected ')' after while condition".to_string(),
+                token: peek.clone(),
+                line,
+            });
+        }
+
+        let body = self.statement()?;
+
+        Ok(Stmt::While {
+            cond: cond,
+            body: Box::new(body),
         })
     }
 

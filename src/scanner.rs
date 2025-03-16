@@ -257,7 +257,7 @@ impl Scanner {
             }
             '"' => self.string(),
             val if self.is_digit(val) => self.number(),
-            val if val.is_alphabetic() => Ok(self.identifier()),
+            val if val.is_alphabetic() || val == '_' => Ok(self.identifier()),
             _ => Err(InterpreterError::Syntax {
                 line: self.line,
                 loc: self.get_loc(),
@@ -311,7 +311,10 @@ impl Scanner {
     }
 
     fn char_at(&self, index: usize) -> char {
-        self.source.chars().nth(index).expect("Scanner: char index out of range")
+        self.source
+            .chars()
+            .nth(index)
+            .expect("Scanner: char index out of range")
     }
 
     fn advance(&mut self) -> char {
@@ -445,7 +448,7 @@ impl Scanner {
         loop {
             let peek = self.peek();
 
-            if !peek.is_alphabetic() {
+            if !peek.is_alphabetic() && peek != '_' {
                 break;
             }
 

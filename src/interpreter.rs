@@ -45,6 +45,10 @@ impl Interpreter {
                 Interpreter::if_(cond, then, e_stmt, env)?;
                 Ok(())
             }
+            Stmt::While { cond, body } => {
+                Interpreter::while_(cond, body, env)?;
+                Ok(())
+            }
         }?;
         Ok(())
     }
@@ -97,6 +101,27 @@ impl Interpreter {
                 drop(env_mut);
                 Interpreter::execute_statement(else_stmt, Rc::clone(&env))?;
             }
+        }
+        Ok(())
+    }
+
+    fn while_(
+        cond: &Expr,
+        body: &Stmt,
+        env: Rc<RefCell<Environment>>,
+    ) -> Result<(), InterpreterError> {
+        loop {
+            let mut env_mut = env.borrow_mut();
+            let cond_eval = {
+                Interpreter::eval(cond, &mut env_mut)?
+            };
+
+            if !cond_eval.is_truthy() {
+                drop(env_mut);
+                break;
+            }
+            drop(env_mut);
+            Interpreter::execute_statement(body, Rc::clone(&env))?;
         }
         Ok(())
     }

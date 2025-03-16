@@ -14,4 +14,8 @@ pub enum Stmt<'a> {
         then: Box<Stmt<'a>>,
         else_: Option<Box<Stmt<'a>>>,
     },
+    While {
+        cond: Expr<'a>,
+        body: Box<Stmt<'a>>,
+    },
 }
