@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self};
 
 use crate::error::InterpreterError;
 
@@ -76,6 +76,12 @@ impl Literal {
             _ => true,
         }
     }
+    pub fn extract_number(&self) -> Option<&f64> {
+        match &self {
+            Literal::NUMBER(val) => Some(val),
+            _ => None,
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -97,6 +103,18 @@ impl fmt::Display for Token {
             )
         } else {
             write!(f, "[Token {:?}] Lexeme: '{}'", self.token_type, self.lexeme)
+        }
+    }
+}
+
+impl fmt::Display for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self {
+            Literal::IDENTIFIER(val) => write!(f, "<identifier> {}", val),
+            Literal::STRING(val) => write!(f, "{}", val),
+            Literal::NUMBER(val) => write!(f, "{}", val),
+            Literal::BOOL(val) => write!(f, "{}", val),
+            Literal::NIL => write!(f, "null"),
         }
     }
 }

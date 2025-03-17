@@ -1,7 +1,12 @@
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use crate::{
-    environment::Environment, error::InterpreterError, expr::Expr, operator::{calc, cmp, eq, logical, unary}, stmt::Stmt, token::{Literal, Token, TokenType}
+    environment::Environment,
+    error::InterpreterError,
+    expr::Expr,
+    operator::{calc, cmp, eq, logical, unary},
+    stmt::Stmt,
+    token::{Literal, Token, TokenType},
 };
 
 pub struct Interpreter {}
@@ -107,9 +112,7 @@ impl Interpreter {
     ) -> Result<(), InterpreterError> {
         loop {
             let mut env_mut = env.borrow_mut();
-            let cond_eval = {
-                Interpreter::eval(cond, &mut env_mut)?
-            };
+            let cond_eval = { Interpreter::eval(cond, &mut env_mut)? };
 
             if !cond_eval.is_truthy() {
                 drop(env_mut);
@@ -134,40 +137,54 @@ impl Interpreter {
                 Ok(Cow::Owned(lit))
             }
             Expr::Binary { left, op, right } => match op.token_type {
-                TokenType::MINUS
-                | TokenType::PLUS
-                | TokenType::STAR
-                | TokenType::SLASH
-                | TokenType::Pow => {
+                TokenType::PLUS => {
+                    let lhs = Interpreter::eval(&left, env)?.into_owned();
+                    let lhs_str = format!("{:?}", lhs);
                     let rhs = Interpreter::eval(&right, env)?;
-                    let l;
-                    let r;
+                    let rhs_ref = rhs.as_ref();
 
-                    if let Literal::NUMBER(right_val) = rhs.as_ref() {
-                        r = *right_val;
-                    } else {
-                        return Err(InterpreterError::Runtime {
+                    let res = match (lhs, rhs_ref) {
+                        (Literal::NUMBER(l), Literal::NUMBER(r)) => {
+                            Some(Cow::Owned(calc(&op.token_type, &l, r, op.line)?))
+                        }
+                        (Literal::STRING(l), Literal::STRING(r)) => {
+                            Some(Cow::Owned(Literal::STRING(l + r)))
+                        }
+                        _ => None,
+                    };
+
+                    match res {
+                        Some(result) => Ok(result),
+                        None => Err(InterpreterError::Runtime {
+                            message: format!("Cannot add {} with {}", lhs_str, rhs_ref),
+                            token: Some(op.to_owned().clone()),
+                            line: op.line,
+                            hint: "Ensure both operands are numbers".to_string(),
+                        }),
+                    }
+                }
+                TokenType::MINUS | TokenType::STAR | TokenType::SLASH | TokenType::Pow => {
+                    let lhs = Interpreter::eval(&left, env)?.into_owned();
+                    let left = lhs
+                        .extract_number()
+                        .ok_or_else(|| InterpreterError::Runtime {
                             message: "Cannot perform arithmetic on non-numbers".to_string(),
                             token: Some(op.to_owned().clone()),
                             line: op.line,
                             hint: "Ensure both operands are numbers".to_string(),
-                        });
-                    }
+                        })?;
 
-                    let lhs = Interpreter::eval(&left, env)?;
-                    if let Literal::NUMBER(left_val) = lhs.as_ref() {
-                        l = *left_val;
-                    } else {
-                        return Err(InterpreterError::Runtime {
+                    let rhs = Interpreter::eval(&right, env)?;
+                    let right = rhs
+                        .extract_number()
+                        .ok_or_else(|| InterpreterError::Runtime {
                             message: "Cannot perform arithmetic on non-numbers".to_string(),
                             token: Some(op.to_owned().clone()),
                             line: op.line,
                             hint: "Ensure both operands are numbers".to_string(),
-                        });
-                    }
+                        })?;
 
-                    let lit = calc(&op.token_type, &l, &r, op.line)?;
-                    Ok(Cow::Owned(lit))
+                    Ok(Cow::Owned(calc(&op.token_type, &left, right, op.line)?))
                 }
                 TokenType::LESS
                 | TokenType::GREATER
