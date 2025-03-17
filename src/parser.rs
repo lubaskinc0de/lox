@@ -1,36 +1,8 @@
 use std::{cell::Cell, rc::Rc};
 
 use crate::{
-    error::InterpreterError,
-    scanner::{Literal, Token, TokenType},
-    stmt::Stmt,
+    error::InterpreterError, expr::Expr, stmt::Stmt, token::{Literal, Token, TokenType}
 };
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub enum Expr<'a> {
-    Binary {
-        left: Box<Expr<'a>>,
-        op: &'a Token,
-        right: Box<Expr<'a>>,
-    },
-    Logical {
-        left: Box<Expr<'a>>,
-        op: &'a Token,
-        right: Box<Expr<'a>>,
-    },
-    Unary {
-        right: Box<Expr<'a>>,
-        op: &'a Token,
-    },
-    Literal(&'a Literal),
-    Grouping(Box<Expr<'a>>),
-    VarRead(&'a Token),
-    Assign {
-        name: &'a Token,
-        value: Box<Expr<'a>>,
-    },
-}
 
 pub struct Parser<'a> {
     tokens: &'a [Token],

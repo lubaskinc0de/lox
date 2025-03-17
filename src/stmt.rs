@@ -1,4 +1,4 @@
-use crate::{parser::Expr, scanner::Token};
+use crate::{expr::Expr, token::Token};
 
 #[derive(Debug, Clone)]
 pub enum Stmt<'a> {

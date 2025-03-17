@@ -1,3 +1,13 @@
+mod environment;
+mod error;
+mod expr;
+mod interpreter;
+mod operator;
+mod parser;
+mod scanner;
+mod stmt;
+mod token;
+
 use std::{
     cell::RefCell,
     fs::File,
@@ -10,13 +20,6 @@ use environment::Environment;
 use interpreter::Interpreter;
 use parser::Parser;
 use scanner::Scanner;
-mod environment;
-mod error;
-mod interpreter;
-mod operator;
-mod parser;
-mod scanner;
-mod stmt;
 
 fn read_file_to_string(file_name: &str) -> String {
     let mut buf = String::new();
@@ -43,7 +46,7 @@ fn run(line: &str, env: Rc<RefCell<Environment>>, do_panic: bool) {
                 panic!("{}", e)
             } else {
                 println!("{}", e);
-                return
+                return;
             }
         }
     };
@@ -56,13 +59,13 @@ fn run(line: &str, env: Rc<RefCell<Environment>>, do_panic: bool) {
                 panic!("{}", e)
             } else {
                 println!("{}", e);
-                return
+                return;
             }
         }
     };
 
     match Interpreter::interpret(&statements, Rc::clone(&env)) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             if do_panic {
                 panic!("{}", e)

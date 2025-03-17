@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use thiserror::Error;
 
-use crate::scanner::Token;
+use crate::token::Token;
 
 #[derive(Debug, Error)]
 pub enum InterpreterError {

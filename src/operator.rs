@@ -1,8 +1,7 @@
 use std::borrow::Cow;
 
 use crate::{
-    error::InterpreterError,
-    scanner::{Literal, Token, TokenType},
+    error::InterpreterError, token::{Literal, Token, TokenType},
 };
 
 pub fn unary(op: &TokenType, right: &Literal, line: usize) -> Result<Literal, InterpreterError> {

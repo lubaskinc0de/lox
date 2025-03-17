@@ -1,12 +1,7 @@
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use crate::{
-    environment::Environment,
-    error::InterpreterError,
-    operator::{calc, cmp, eq, logical, unary},
-    parser::Expr,
-    scanner::{Literal, Token, TokenType},
-    stmt::Stmt,
+    environment::Environment, error::InterpreterError, expr::Expr, operator::{calc, cmp, eq, logical, unary}, stmt::Stmt, token::{Literal, Token, TokenType}
 };
 
 pub struct Interpreter {}

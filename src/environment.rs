@@ -2,10 +2,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::{borrow::Cow, cell::RefCell};
 
-use crate::{
-    error::InterpreterError,
-    scanner::{Literal, Token},
-};
+use crate::error::InterpreterError;
+use crate::token::{Literal, Token};
 
 #[derive(Debug, Clone)]
 pub struct Environment {
