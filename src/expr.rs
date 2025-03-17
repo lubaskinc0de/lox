@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::token::{Literal, Token};
 
 #[derive(Debug, Clone)]
@@ -5,7 +7,7 @@ use crate::token::{Literal, Token};
 pub enum Expr<'a> {
     Binary {
         left: Box<Expr<'a>>,
-        op: &'a Token,
+        op: Cow<'a, Token>,
         right: Box<Expr<'a>>,
     },
     Logical {

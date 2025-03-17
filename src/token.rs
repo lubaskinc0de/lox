@@ -28,6 +28,11 @@ pub enum TokenType {
     LESS,
     LessEqual,
     Pow,
+    PlusEqual,
+    MinusEqual,
+    StarEqual,
+    SlashEqual,
+    PowEqual,
 
     // Literals.
     IDENTIFIER,

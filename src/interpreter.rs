@@ -157,7 +157,7 @@ impl Interpreter {
                         Some(result) => Ok(result),
                         None => Err(InterpreterError::Runtime {
                             message: format!("Cannot add {} with {}", lhs_str, rhs_ref),
-                            token: Some(op.to_owned().clone()),
+                            token: Some(op.clone().into_owned()),
                             line: op.line,
                             hint: "Ensure both operands are numbers".to_string(),
                         }),
@@ -169,7 +169,7 @@ impl Interpreter {
                         .extract_number()
                         .ok_or_else(|| InterpreterError::Runtime {
                             message: "Cannot perform arithmetic on non-numbers".to_string(),
-                            token: Some(op.to_owned().clone()),
+                            token: Some(op.clone().into_owned()),
                             line: op.line,
                             hint: "Ensure both operands are numbers".to_string(),
                         })?;
@@ -179,7 +179,7 @@ impl Interpreter {
                         .extract_number()
                         .ok_or_else(|| InterpreterError::Runtime {
                             message: "Cannot perform arithmetic on non-numbers".to_string(),
-                            token: Some(op.to_owned().clone()),
+                            token: Some(op.clone().into_owned()),
                             line: op.line,
                             hint: "Ensure both operands are numbers".to_string(),
                         })?;
@@ -199,7 +199,7 @@ impl Interpreter {
                     } else {
                         return Err(InterpreterError::Runtime {
                             message: "Cannot perform arithmetic on non-numbers".to_string(),
-                            token: Some(op.to_owned().clone()),
+                            token: Some(op.clone().into_owned()),
                             line: op.line,
                             hint: "Ensure both operands are numbers".to_string(),
                         });
@@ -211,7 +211,7 @@ impl Interpreter {
                     } else {
                         return Err(InterpreterError::Runtime {
                             message: "Cannot perform arithmetic on non-numbers".to_string(),
-                            token: Some(op.to_owned().clone()),
+                            token: Some(op.clone().into_owned()),
                             line: op.line,
                             hint: "Ensure both operands are numbers".to_string(),
                         });
@@ -228,7 +228,7 @@ impl Interpreter {
                 }
                 _ => Err(InterpreterError::Runtime {
                     message: "Unsupported operator".to_string(),
-                    token: Some(op.to_owned().clone()),
+                    token: Some(op.clone().into_owned()),
                     line: op.line,
                     hint: "Check the operator and try again".to_string(),
                 }),

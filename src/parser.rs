@@ -1,7 +1,10 @@
-use std::{cell::Cell, rc::Rc};
+use std::{borrow::Cow, cell::Cell, collections::HashMap, rc::Rc};
 
 use crate::{
-    error::InterpreterError, expr::Expr, stmt::Stmt, token::{Literal, Token, TokenType}
+    error::InterpreterError,
+    expr::Expr,
+    stmt::Stmt,
+    token::{Literal, Token, TokenType},
 };
 
 pub struct Parser<'a> {
@@ -254,7 +257,10 @@ impl<'a> Parser<'a> {
             body = Stmt::Block(vec![body, Stmt::Expression(increment.unwrap())])
         }
 
-        body = Stmt::While { cond: condition, body: Box::new(body) };
+        body = Stmt::While {
+            cond: condition,
+            body: Box::new(body),
+        };
 
         if initializer.is_some() {
             body = Stmt::Block(vec![initializer.unwrap(), body]);
@@ -278,6 +284,49 @@ impl<'a> Parser<'a> {
                 Expr::VarRead(name_token) => Ok(Expr::Assign {
                     name: name_token,
                     value: Box::new(value),
+                }),
+                _ => Err(InterpreterError::Parser {
+                    message: String::from("Invalid assignment target"),
+                    token: equals.clone(),
+                    line: equals.line,
+                }),
+            };
+        } else if self.matches(&[
+            TokenType::PlusEqual,
+            TokenType::MinusEqual,
+            TokenType::SlashEqual,
+            TokenType::StarEqual,
+        ]) {
+            let equals = self.prev();
+            let value = self.assignment()?;
+            let type_map: HashMap<TokenType, TokenType> = HashMap::from([
+                (TokenType::PlusEqual, TokenType::PLUS),
+                (TokenType::MinusEqual, TokenType::MINUS),
+                (TokenType::StarEqual, TokenType::STAR),
+                (TokenType::SlashEqual, TokenType::SLASH),
+                (TokenType::PowEqual, TokenType::Pow),
+            ]);
+            let lexeme_map: HashMap<TokenType, String> = HashMap::from([
+                (TokenType::PlusEqual, "+".to_string()),
+                (TokenType::MinusEqual, "-".to_string()),
+                (TokenType::StarEqual, "*".to_string()),
+                (TokenType::SlashEqual, "/".to_string()),
+                (TokenType::PowEqual, "**".to_string()),
+            ]);
+
+            return match expr {
+                Expr::VarRead(name_token) => Ok(Expr::Assign {
+                    name: name_token,
+                    value: Box::new(Expr::Binary {
+                        left: Box::new(expr),
+                        op: Cow::Owned(Token {
+                            token_type: type_map.get(&equals.token_type).unwrap().to_owned(),
+                            lexeme: lexeme_map.get(&equals.token_type).unwrap().to_owned(),
+                            literal: None,
+                            line: name_token.line,
+                        }),
+                        right: Box::new(value),
+                    }),
                 }),
                 _ => Err(InterpreterError::Parser {
                     message: String::from("Invalid assignment target"),
@@ -329,7 +378,7 @@ impl<'a> Parser<'a> {
             let right = self.comparison()?;
             expr = Expr::Binary {
                 left: Box::new(expr),
-                op,
+                op: Cow::Borrowed(op),
                 right: Box::new(right),
             };
         }
@@ -348,7 +397,7 @@ impl<'a> Parser<'a> {
             let right = self.term()?;
             expr = Expr::Binary {
                 left: Box::new(expr),
-                op,
+                op: Cow::Borrowed(op),
                 right: Box::new(right),
             }
         }
@@ -362,7 +411,7 @@ impl<'a> Parser<'a> {
             let right = self.factor()?;
             expr = Expr::Binary {
                 left: Box::new(expr),
-                op,
+                op: Cow::Borrowed(op),
                 right: Box::new(right),
             }
         }
@@ -376,7 +425,7 @@ impl<'a> Parser<'a> {
             let right = self.unary()?;
             expr = Expr::Binary {
                 left: Box::new(expr),
-                op,
+                op: Cow::Borrowed(op),
                 right: Box::new(right),
             }
         }
@@ -402,7 +451,7 @@ impl<'a> Parser<'a> {
             let right = self.primary()?;
             expr = Expr::Binary {
                 left: Box::new(expr),
-                op,
+                op: Cow::Borrowed(op),
                 right: Box::new(right),
             }
         }

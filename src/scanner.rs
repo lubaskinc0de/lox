@@ -1,9 +1,8 @@
-use crate::{error::InterpreterError, token::{Literal, Token, TokenType}};
-use std::{
-    collections::HashMap,
-    rc::Rc,
-    vec,
+use crate::{
+    error::InterpreterError,
+    token::{Literal, Token, TokenType},
 };
+use std::{collections::HashMap, rc::Rc, vec};
 
 #[allow(dead_code)]
 pub struct Scanner {
@@ -55,14 +54,38 @@ impl Scanner {
             '}' => Ok(self.add_token(TokenType::RightBrace, None)),
             ',' => Ok(self.add_token(TokenType::COMMA, None)),
             '.' => Ok(self.add_token(TokenType::DOT, None)),
-            '-' => Ok(self.add_token(TokenType::MINUS, None)),
-            '+' => Ok(self.add_token(TokenType::PLUS, None)),
-            ';' => Ok(self.add_token(TokenType::SEMICOLON, None)),
-            '*' => {
-                let is_equal = self.match_next('*');
+            '-' => {
+                let is_equal = self.match_next('=');
                 Ok(self.add_token(
                     if is_equal {
+                        TokenType::MinusEqual
+                    } else {
+                        TokenType::MINUS
+                    },
+                    None,
+                ))
+            }
+            '+' => {
+                let is_equal = self.match_next('=');
+                Ok(self.add_token(
+                    if is_equal {
+                        TokenType::PlusEqual
+                    } else {
+                        TokenType::PLUS
+                    },
+                    None,
+                ))
+            }
+            ';' => Ok(self.add_token(TokenType::SEMICOLON, None)),
+            '*' => {
+                let is_equal_star = self.match_next('*');
+                let is_equal_equal = self.match_next('=');
+
+                Ok(self.add_token(
+                    if is_equal_star {
                         TokenType::Pow
+                    } else if is_equal_equal {
+                        TokenType::StarEqual
                     } else {
                         TokenType::STAR
                     },
@@ -114,9 +137,14 @@ impl Scanner {
                 ))
             }
             '/' => {
-                let is_equal = self.match_next('/');
+                let is_equal_slash = self.match_next('/');
+                let is_equal_equal = self.match_next('=');
 
-                if !is_equal {
+                if is_equal_equal {
+                    return Ok(self.add_token(TokenType::SlashEqual, None));
+                }
+
+                if !is_equal_slash {
                     Ok(self.add_token(TokenType::SLASH, None))
                 } else {
                     Ok(loop {
