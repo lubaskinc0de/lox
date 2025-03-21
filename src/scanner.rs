@@ -55,18 +55,24 @@ impl Scanner {
             ',' => Ok(self.add_token(TokenType::COMMA, None)),
             '.' => Ok(self.add_token(TokenType::DOT, None)),
             '-' => {
-                let is_equal = self.match_next('=');
-                Ok(self.add_token(
-                    if is_equal {
-                        TokenType::MinusEqual
-                    } else {
-                        TokenType::MINUS
-                    },
-                    None,
-                ))
+                let is_equal = self.matches('=');
+                if is_equal {
+                    Ok(self.add_token(TokenType::MinusEqual, None))
+                } else {
+                    self.current -= 1;
+                    if self.match_prev('-')
+                        && self.tokens.last().unwrap().token_type == TokenType::MINUS
+                    {
+                        self.tokens.pop().unwrap();
+                        self.current += 1;
+                        return Ok(());
+                    }
+                    self.current += 1;
+                    Ok(self.add_token(TokenType::MINUS, None))
+                }
             }
             '+' => {
-                let is_equal = self.match_next('=');
+                let is_equal = self.matches('=');
                 Ok(self.add_token(
                     if is_equal {
                         TokenType::PlusEqual
@@ -78,8 +84,8 @@ impl Scanner {
             }
             ';' => Ok(self.add_token(TokenType::SEMICOLON, None)),
             '*' => {
-                let is_equal_star = self.match_next('*');
-                let is_equal_equal = self.match_next('=');
+                let is_equal_star = self.matches('*');
+                let is_equal_equal = self.matches('=');
 
                 Ok(self.add_token(
                     if is_equal_star {
@@ -93,7 +99,7 @@ impl Scanner {
                 ))
             }
             '!' => {
-                let is_equal = self.match_next('=');
+                let is_equal = self.matches('=');
                 Ok(self.add_token(
                     if is_equal {
                         TokenType::BangEqual
@@ -104,7 +110,7 @@ impl Scanner {
                 ))
             }
             '=' => {
-                let is_equal = self.match_next('=');
+                let is_equal = self.matches('=');
                 Ok(self.add_token(
                     if is_equal {
                         TokenType::EqualEqual
@@ -115,7 +121,7 @@ impl Scanner {
                 ))
             }
             '<' => {
-                let is_equal = self.match_next('=');
+                let is_equal = self.matches('=');
                 Ok(self.add_token(
                     if is_equal {
                         TokenType::LessEqual
@@ -126,7 +132,7 @@ impl Scanner {
                 ))
             }
             '>' => {
-                let is_equal = self.match_next('=');
+                let is_equal = self.matches('=');
                 Ok(self.add_token(
                     if is_equal {
                         TokenType::GreaterEqual
@@ -137,8 +143,8 @@ impl Scanner {
                 ))
             }
             '/' => {
-                let is_equal_slash = self.match_next('/');
-                let is_equal_equal = self.match_next('=');
+                let is_equal_slash = self.matches('/');
+                let is_equal_equal = self.matches('=');
 
                 if is_equal_equal {
                     return Ok(self.add_token(TokenType::SlashEqual, None));
@@ -229,7 +235,7 @@ impl Scanner {
         res
     }
 
-    fn match_next(&mut self, expected: char) -> bool {
+    fn matches(&mut self, expected: char) -> bool {
         if self.is_at_end() {
             return false;
         }
@@ -237,6 +243,16 @@ impl Scanner {
             return false;
         }
         self.advance();
+        return true;
+    }
+
+    fn match_prev(&mut self, expected: char) -> bool {
+        if self.current == 0 {
+            return false;
+        }
+        if self.char_at(self.current - 1) != expected {
+            return false;
+        }
         return true;
     }
 
