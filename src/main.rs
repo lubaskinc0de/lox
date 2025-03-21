@@ -50,7 +50,6 @@ fn run(line: &str, env: Rc<RefCell<Environment>>, do_panic: bool) {
             }
         }
     };
-    println!("{:#?}", tokens);
 
     let parser = Parser::new(&tokens);
     let statements = match parser.parse() {
