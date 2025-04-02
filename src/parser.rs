@@ -445,7 +445,7 @@ impl<'a> Parser<'a> {
     }
 
     fn pow(&self) -> Result<Expr, InterpreterError> {
-        let mut expr = self.primary()?;
+        let mut expr = self.call()?;
         while self.matches(&[TokenType::Pow]) {
             let op = self.prev();
             let right = self.primary()?;
@@ -456,6 +456,46 @@ impl<'a> Parser<'a> {
             }
         }
         Ok(expr)
+    }
+
+    fn call(&self) -> Result<Expr, InterpreterError> {
+        let mut expr = self.primary()?;
+
+        while self.matches(&[TokenType::LeftParen]) {
+            expr = self.finish_call(expr, self.prev())?;
+        }
+        Ok(expr)
+    }
+
+    fn finish_call<'b>(
+        &'b self,
+        calee: Expr<'b>,
+        left_paren: &Token,
+    ) -> Result<Expr<'b>, InterpreterError>
+    where
+        'a: 'b,
+    {
+        let mut args: Vec<Box<Expr>> = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            args.push(Box::new(self.expression()?));
+
+            while self.matches(&[TokenType::COMMA]) {
+                args.push(Box::new(self.expression()?));
+            }
+        }
+        let closing_paren = self.consume(TokenType::RightParen);
+        if closing_paren.is_none() {
+            return Err(InterpreterError::Parser {
+                message: "Expected ')' after args list".to_string(),
+                token: left_paren.clone(),
+                line: left_paren.line,
+            });
+        }
+        Ok(Expr::Call {
+            calee: Box::new(calee),
+            paren: closing_paren.unwrap(),
+            args,
+        })
     }
 
     fn primary(&self) -> Result<Expr, InterpreterError> {

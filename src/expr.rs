@@ -26,4 +26,9 @@ pub enum Expr<'a> {
         name: &'a Token,
         value: Box<Expr<'a>>,
     },
+    Call {
+        calee: Box<Expr<'a>>,
+        paren: &'a Token,
+        args: Vec<Box<Expr<'a>>>,
+    },
 }
