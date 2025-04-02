@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     fmt::{self},
-    rc::Rc,
+    rc::{Rc, Weak},
 };
 
 use crate::error::InterpreterError;
@@ -151,3 +151,4 @@ impl Token {
 }
 
 pub type RcMutLiteral = Rc<RefCell<Literal>>;
+

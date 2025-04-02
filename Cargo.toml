@@ -8,4 +8,10 @@ clap = { version = "4.5.31", features = ["derive"] }
 thiserror = "2.0.12"
 
 [profile.release]
-debug = true
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = 'abort'
+strip = true
+jemalloc = true
+codegen-units-std = 1
