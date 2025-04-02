@@ -229,7 +229,7 @@ impl<'a> Parser<'a> {
             initializer = Some(self.expression_stmt()?);
         }
 
-        let mut condition: Expr = Expr::Literal(&Literal::BOOL(true));
+        let mut condition: Expr = Expr::Literal(Literal::BOOL(true));
         if !self.check(TokenType::SEMICOLON) {
             condition = self.expression()?;
         }
@@ -500,17 +500,17 @@ impl<'a> Parser<'a> {
 
     fn primary(&self) -> Result<Expr, InterpreterError> {
         if self.matches(&[TokenType::FALSE]) {
-            return Ok(Expr::Literal(&Literal::BOOL(false)));
+            return Ok(Expr::Literal(Literal::BOOL(false)));
         }
         if self.matches(&[TokenType::TRUE]) {
-            return Ok(Expr::Literal(&Literal::BOOL(true)));
+            return Ok(Expr::Literal(Literal::BOOL(true)));
         }
         if self.matches(&[TokenType::NIL]) {
-            return Ok(Expr::Literal(&Literal::NIL));
+            return Ok(Expr::Literal(Literal::NIL));
         }
 
         if self.matches(&[TokenType::NUMBER, TokenType::STRING]) {
-            return Ok(Expr::Literal((self.prev().literal.as_ref()).unwrap()));
+            return Ok(Expr::Literal((self.prev().literal).clone().unwrap()));
         }
 
         if self.matches(&[TokenType::IDENTIFIER]) {

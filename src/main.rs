@@ -1,6 +1,8 @@
+mod callable;
 mod environment;
 mod error;
 mod expr;
+mod helper;
 mod interpreter;
 mod operator;
 mod parser;
@@ -16,7 +18,7 @@ use std::{
 };
 
 use clap::Parser as CliParser;
-use environment::Environment;
+use environment::{Environment, RcMutEnv};
 use interpreter::Interpreter;
 use parser::Parser;
 use scanner::Scanner;
@@ -36,7 +38,12 @@ fn run_file(file_name: &str) {
     run(&source, Rc::new(RefCell::new(env)), true);
 }
 
-fn run(line: &str, env: Rc<RefCell<Environment>>, do_panic: bool) {
+fn run_line(source: String) {
+    let env = Environment::new(None);
+    run(&source, Rc::new(RefCell::new(env)), true);
+}
+
+fn run(line: &str, env: RcMutEnv, do_panic: bool) {
     let mut scanner = Scanner::new(line);
 
     let tokens = match scanner.scan_tokens() {

@@ -1,40 +1,35 @@
-use std::{borrow::Cow, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    environment::Environment,
+    callable::Callable,
+    environment::{Environment, RcMutEnv},
     error::InterpreterError,
     expr::Expr,
     operator::{calc, cmp, eq, logical, unary},
+    rc_cell,
     stmt::Stmt,
-    token::{Literal, Token, TokenType},
+    token::{Literal, RcMutLiteral, Token, TokenType},
 };
 
 pub struct Interpreter {}
 
 impl Interpreter {
-    pub fn interpret(
-        program: &[Stmt],
-        globals: Rc<RefCell<Environment>>,
-    ) -> Result<(), InterpreterError> {
+    pub fn interpret(program: &[Stmt], globals: RcMutEnv) -> Result<(), InterpreterError> {
         for stmt in program {
             Interpreter::execute_statement(stmt, Rc::clone(&globals))?;
         }
         Ok(())
     }
 
-    fn execute_statement(
-        stmt: &Stmt,
-        env: Rc<RefCell<Environment>>,
-    ) -> Result<(), InterpreterError> {
+    fn execute_statement(stmt: &Stmt, env: RcMutEnv) -> Result<(), InterpreterError> {
         match stmt {
-            Stmt::Expression(expr) => Interpreter::eval(expr, &mut env.borrow_mut()).map(|_| {}),
+            Stmt::Expression(expr) => Interpreter::eval(expr, Rc::clone(&env)).map(|_| {}),
             Stmt::Print(expr) => {
-                let mut e = env.borrow_mut();
-                let evaluated = Interpreter::eval(expr, &mut e)?;
-                Ok(Interpreter::print(evaluated.as_ref()))
+                let evaluated = Interpreter::eval(expr, Rc::clone(&env))?;
+                Ok(Interpreter::print(&evaluated.borrow()))
             }
             Stmt::VarDeclaration { expr, name } => {
-                Interpreter::declare_variable(expr, name, &mut env.borrow_mut())
+                Interpreter::declare_variable(expr, name, Rc::clone(&env))
             }
             Stmt::Block(code) => {
                 Interpreter::block(code, env)?;
@@ -66,22 +61,22 @@ impl Interpreter {
     fn declare_variable(
         expr: &Option<Expr>,
         name: &Token,
-        env: &mut Environment,
+        env: RcMutEnv,
     ) -> Result<(), InterpreterError> {
-        let mut right: Option<Literal> = None;
+        let mut right: Option<RcMutLiteral> = None;
 
         if let Some(t_expr) = expr {
-            let evaluated = Interpreter::eval(t_expr, env)?;
-            right = Some(evaluated.into_owned());
+            let evaluated = Interpreter::eval(t_expr, Rc::clone(&env))?;
+            right = Some(evaluated);
         }
 
-        env.define(name, right)?;
+        env.borrow_mut().define(name, right)?;
         Ok(())
     }
 
-    fn block(code: &[Stmt], outer: Rc<RefCell<Environment>>) -> Result<(), InterpreterError> {
+    fn block(code: &[Stmt], outer: RcMutEnv) -> Result<(), InterpreterError> {
         let env = Environment::new(Some(Rc::clone(&outer)));
-        Interpreter::interpret(code, Rc::new(RefCell::new(env)))?;
+        Interpreter::interpret(code, rc_cell!(env))?;
         Ok(())
     }
 
@@ -89,66 +84,82 @@ impl Interpreter {
         cond: &Expr,
         then: &Stmt,
         else_: Option<&Stmt>,
-        env: Rc<RefCell<Environment>>,
+        env: RcMutEnv,
     ) -> Result<(), InterpreterError> {
         {
-            let mut env_mut = env.borrow_mut();
-            let cond_eval = Interpreter::eval(cond, &mut env_mut)?;
-            if cond_eval.is_truthy() {
-                drop(env_mut);
+            let cond_eval = Interpreter::eval(cond, Rc::clone(&env))?;
+            if cond_eval.borrow().is_truthy() {
                 Interpreter::execute_statement(then, Rc::clone(&env))?;
             } else if let Some(else_stmt) = else_ {
-                drop(env_mut);
                 Interpreter::execute_statement(else_stmt, Rc::clone(&env))?;
             }
         }
         Ok(())
     }
 
-    fn while_(
-        cond: &Expr,
-        body: &Stmt,
-        env: Rc<RefCell<Environment>>,
-    ) -> Result<(), InterpreterError> {
+    fn while_(cond: &Expr, body: &Stmt, env: RcMutEnv) -> Result<(), InterpreterError> {
         loop {
-            let mut env_mut = env.borrow_mut();
-            let cond_eval = { Interpreter::eval(cond, &mut env_mut)? };
+            let cond_eval = { Interpreter::eval(cond, Rc::clone(&env))? };
 
-            if !cond_eval.is_truthy() {
-                drop(env_mut);
+            if !cond_eval.borrow().is_truthy() {
                 break;
             }
-            drop(env_mut);
             Interpreter::execute_statement(body, Rc::clone(&env))?;
         }
         Ok(())
     }
 
-    fn eval<'a>(
-        expr: &'a Expr,
-        env: &'a mut Environment,
-    ) -> Result<Cow<'a, Literal>, InterpreterError> {
+    fn do_call(
+        calee: Box<dyn Callable>,
+        paren: &Token,
+        args: &[Box<Expr>],
+        env: RcMutEnv,
+    ) -> Result<RcMutLiteral, InterpreterError> {
+        let mut args_evaluated: Vec<RcMutLiteral> = Vec::new();
+
+        for each in args {
+            let evaluated = Interpreter::eval(&each, Rc::clone(&env))?;
+            args_evaluated.push(evaluated);
+        }
+
+        if args.len() != calee.arity() {
+            return Err(InterpreterError::Runtime {
+                message: format!(
+                    "Expected {} arguments but got {}",
+                    calee.arity(),
+                    args.len()
+                ),
+                token: Some(paren.clone()),
+                line: paren.line,
+                hint: "Check arguments you pass".to_string(),
+            });
+        }
+        Ok(calee.do_call(args_evaluated.as_slice()))
+    }
+
+    fn eval<'a>(expr: &'a Expr, env: RcMutEnv) -> Result<RcMutLiteral, InterpreterError> {
         match expr {
-            Expr::Literal(val) => Ok(Cow::Borrowed(val)),
-            Expr::Grouping(expr) => Interpreter::eval(&expr, env),
+            Expr::Literal(val) => Ok(rc_cell!(val.clone())),
+            Expr::Grouping(expr) => Interpreter::eval(&*expr, env),
             Expr::Unary { right, op } => {
-                let evaluated = Interpreter::eval(&right, env)?;
-                let lit = unary(&op.token_type, evaluated.as_ref(), op.line)?;
-                Ok(Cow::Owned(lit))
+                let evaluated = Interpreter::eval(&*right, env)?;
+                let lit = unary(&op.token_type, &evaluated.borrow(), op.line)?;
+                Ok(lit)
             }
             Expr::Binary { left, op, right } => match op.token_type {
                 TokenType::PLUS => {
-                    let lhs = Interpreter::eval(&left, env)?.into_owned();
-                    let lhs_str = format!("{:?}", lhs);
-                    let rhs = Interpreter::eval(&right, env)?;
-                    let rhs_ref = rhs.as_ref();
+                    let lhs = Interpreter::eval(&*left, Rc::clone(&env))?;
+                    let l_borrow = lhs.borrow();
+                    let lhs_str = format!("{:?}", l_borrow);
+                    let rhs = Interpreter::eval(&*right, env)?;
+                    let r_borrow = rhs.borrow();
 
-                    let res = match (lhs, rhs_ref) {
-                        (Literal::NUMBER(l), Literal::NUMBER(r)) => {
-                            Some(Cow::Owned(calc(&op.token_type, &l, r, op.line)?))
-                        }
+                    let res = match (&*l_borrow, &*r_borrow) {
+                        (Literal::NUMBER(l), Literal::NUMBER(r)) => Some(Rc::new(RefCell::new(
+                            calc(&op.token_type, &l, &r, op.line)?,
+                        ))),
                         (Literal::STRING(l), Literal::STRING(r)) => {
-                            Some(Cow::Owned(Literal::STRING(l + r)))
+                            Some(Rc::new(RefCell::new(Literal::STRING(l.to_owned() + r))))
                         }
                         _ => None,
                     };
@@ -156,7 +167,7 @@ impl Interpreter {
                     match res {
                         Some(result) => Ok(result),
                         None => Err(InterpreterError::Runtime {
-                            message: format!("Cannot add {} with {}", lhs_str, rhs_ref),
+                            message: format!("Cannot add {} with {}", lhs_str, r_borrow),
                             token: Some(op.clone().into_owned()),
                             line: op.line,
                             hint: "Ensure both operands are numbers".to_string(),
@@ -164,37 +175,52 @@ impl Interpreter {
                     }
                 }
                 TokenType::MINUS | TokenType::STAR | TokenType::SLASH | TokenType::Pow => {
-                    let lhs = Interpreter::eval(&left, env)?.into_owned();
-                    let left = lhs
-                        .extract_number()
-                        .ok_or_else(|| InterpreterError::Runtime {
-                            message: "Cannot perform arithmetic on non-numbers".to_string(),
-                            token: Some(op.clone().into_owned()),
-                            line: op.line,
-                            hint: "Ensure both operands are numbers".to_string(),
-                        })?;
+                    let lhs = Interpreter::eval(&*left, Rc::clone(&env))?;
+                    let bwed_l = lhs.borrow();
+                    let left =
+                        bwed_l
+                            .extract_number()
+                            .ok_or_else(|| InterpreterError::Runtime {
+                                message: "Cannot perform arithmetic on non-numbers".to_string(),
+                                token: Some(op.clone().into_owned()),
+                                line: op.line,
+                                hint: "Ensure both operands are numbers".to_string(),
+                            })?;
 
-                    let rhs = Interpreter::eval(&right, env)?;
-                    let right = rhs
-                        .extract_number()
-                        .ok_or_else(|| InterpreterError::Runtime {
-                            message: "Cannot perform arithmetic on non-numbers".to_string(),
-                            token: Some(op.clone().into_owned()),
-                            line: op.line,
-                            hint: "Ensure both operands are numbers".to_string(),
-                        })?;
+                    let rhs = Interpreter::eval(&*right, env)?;
+                    let bwed_r = rhs.borrow();
+                    let right =
+                        bwed_r
+                            .extract_number()
+                            .ok_or_else(|| InterpreterError::Runtime {
+                                message: "Cannot perform arithmetic on non-numbers".to_string(),
+                                token: Some(op.clone().into_owned()),
+                                line: op.line,
+                                hint: "Ensure both operands are numbers".to_string(),
+                            })?;
 
-                    Ok(Cow::Owned(calc(&op.token_type, &left, right, op.line)?))
+                    Ok(Rc::new(RefCell::new(calc(
+                        &op.token_type,
+                        &left,
+                        right,
+                        op.line,
+                    )?)))
+                }
+                TokenType::BangEqual | TokenType::EqualEqual => {
+                    let rhs = Interpreter::eval(&*right, Rc::clone(&env))?;
+                    let lhs = Interpreter::eval(&*left, env)?;
+                    let lit = eq(&op.token_type, &lhs.borrow(), &rhs.borrow(), op.line)?;
+                    Ok(lit)
                 }
                 TokenType::LESS
                 | TokenType::GREATER
                 | TokenType::LessEqual
                 | TokenType::GreaterEqual => {
-                    let rhs = Interpreter::eval(&right, env)?;
+                    let rhs = Interpreter::eval(&*right, Rc::clone(&env))?;
                     let l;
                     let r;
 
-                    if let Literal::NUMBER(right_val) = rhs.as_ref() {
+                    if let Literal::NUMBER(right_val) = &*rhs.borrow() {
                         r = *right_val;
                     } else {
                         return Err(InterpreterError::Runtime {
@@ -205,8 +231,8 @@ impl Interpreter {
                         });
                     }
 
-                    let lhs = Interpreter::eval(&left, env)?;
-                    if let Literal::NUMBER(left_val) = lhs.as_ref() {
+                    let lhs = Interpreter::eval(&*left, env)?;
+                    if let Literal::NUMBER(left_val) = &*lhs.borrow() {
                         l = *left_val;
                     } else {
                         return Err(InterpreterError::Runtime {
@@ -218,13 +244,7 @@ impl Interpreter {
                     }
 
                     let lit = cmp(&op.token_type, &l, &r, op.line)?;
-                    Ok(Cow::Owned(lit))
-                }
-                TokenType::BangEqual | TokenType::EqualEqual => {
-                    let rhs = Interpreter::eval(&right, env)?.into_owned();
-                    let lhs = Interpreter::eval(&left, env)?;
-                    let lit = eq(&op.token_type, lhs.as_ref(), &rhs, op.line)?;
-                    Ok(Cow::Owned(lit))
+                    Ok(rc_cell!(lit))
                 }
                 _ => Err(InterpreterError::Runtime {
                     message: "Unsupported operator".to_string(),
@@ -234,22 +254,22 @@ impl Interpreter {
                 }),
             },
             Expr::Logical { left, op, right } => {
-                let left_lit = Interpreter::eval(&left, env)?.into_owned();
-                let right_lit = Interpreter::eval(&right, env)?;
-                let lit = logical(Cow::Owned(left_lit), right_lit, op)?;
+                let left_lit = Interpreter::eval(&*left, Rc::clone(&env))?;
+                let right_lit = Interpreter::eval(&*right, env)?;
+                let lit = logical(left_lit, right_lit, op)?;
                 Ok(lit)
             }
             Expr::VarRead(token) => {
-                let var = env.get(&token)?;
+                let var = env.borrow().get(&token)?;
                 Ok(var)
             }
             Expr::Assign { name, value } => {
-                let evaluated = Interpreter::eval(&value, env)?;
-                let scalar = Some(evaluated.into_owned());
-                let ret = env.assign(name, scalar)?;
-                let owned = Cow::Owned(ret);
-                Ok(owned)
+                let evaluated = Interpreter::eval(&*value, Rc::clone(&env))?;
+                let scalar = Some(evaluated);
+                let ret = env.borrow_mut().assign(name, scalar)?;
+                Ok(ret)
             }
+            Expr::Call { calee, paren, args } => todo!(),
         }
     }
 }

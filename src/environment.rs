@@ -1,25 +1,32 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::{borrow::Cow, cell::RefCell};
 
 use crate::error::InterpreterError;
-use crate::token::{Literal, Token};
+use crate::rc_cell;
+use crate::token::{Literal, RcMutLiteral, Token};
+
+pub type RcMutEnv = Rc<RefCell<Environment>>;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
-    values: HashMap<String, Literal>,
-    outer: Option<Rc<RefCell<Environment>>>,
+    values: HashMap<String, RcMutLiteral>,
+    outer: Option<RcMutEnv>,
 }
 
 impl Environment {
-    pub fn new(outer: Option<Rc<RefCell<Environment>>>) -> Self {
+    pub fn new(outer: Option<RcMutEnv>) -> Self {
         Self {
             values: HashMap::new(),
             outer,
         }
     }
 
-    pub fn define(&mut self, name: &Token, value: Option<Literal>) -> Result<(), InterpreterError> {
+    pub fn define(
+        &mut self,
+        name: &Token,
+        value: Option<RcMutLiteral>,
+    ) -> Result<(), InterpreterError> {
         let id = name.expect_identifier()?;
         if self.values.contains_key(id.as_str()) {
             return Err(InterpreterError::Runtime {
@@ -29,18 +36,19 @@ impl Environment {
                 hint: "You are trying to declare a var that already declared".to_string(),
             });
         }
-        self.values.insert(id, value.unwrap_or(Literal::NIL));
+        let val = value.unwrap_or(rc_cell!(Literal::NIL));
+        self.values.insert(id, val);
         Ok(())
     }
 
-    pub fn get(&self, name: &Token) -> Result<Cow<'_, Literal>, InterpreterError> {
+    pub fn get(&self, name: &Token) -> Result<RcMutLiteral, InterpreterError> {
         let var_name = name.expect_identifier()?;
         if let Some(val) = self.values.get(&var_name) {
-            return Ok(Cow::Borrowed(val));
+            return Ok(Rc::clone(&val));
         }
         if let Some(outer) = &self.outer {
-            let val = outer.borrow().get(name)?.into_owned();
-            return Ok(Cow::Owned(val));
+            let val = outer.borrow().get(name)?;
+            return Ok(Rc::clone(&val));
         }
         Err(InterpreterError::Runtime {
             message: "Variable is not defined".to_string(),
@@ -53,13 +61,14 @@ impl Environment {
     pub fn assign(
         &mut self,
         name: &Token,
-        value: Option<Literal>,
-    ) -> Result<Literal, InterpreterError> {
+        value: Option<RcMutLiteral>,
+    ) -> Result<RcMutLiteral, InterpreterError> {
         let id = name.expect_identifier()?;
 
         if self.values.contains_key(&id) {
-            let prev = self.get(name)?.into_owned();
-            self.values.insert(id, value.unwrap_or(Literal::NIL));
+            let prev = self.get(name)?;
+            self.values
+                .insert(id, value.unwrap_or(rc_cell!(Literal::NIL)));
             return Ok(prev);
         }
 

@@ -1,13 +1,18 @@
-use std::borrow::Cow;
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    error::InterpreterError, token::{Literal, Token, TokenType},
+    error::InterpreterError,
+    token::{Literal, RcMutLiteral, Token, TokenType},
 };
 
-pub fn unary(op: &TokenType, right: &Literal, line: usize) -> Result<Literal, InterpreterError> {
+pub fn unary(
+    op: &TokenType,
+    right: &Literal,
+    line: usize,
+) -> Result<RcMutLiteral, InterpreterError> {
     match op {
         TokenType::MINUS => match right {
-            Literal::NUMBER(number) => Ok(Literal::NUMBER(-number)),
+            Literal::NUMBER(number) => Ok(Rc::new(RefCell::new(Literal::NUMBER(-number)))),
             _ => Err(InterpreterError::Runtime {
                 message: "Cannot apply minus to non-number".to_string(),
                 token: None,
@@ -15,7 +20,7 @@ pub fn unary(op: &TokenType, right: &Literal, line: usize) -> Result<Literal, In
                 hint: "Ensure the operand is a number".to_string(),
             }),
         },
-        TokenType::BANG => Ok(Literal::BOOL(!right.is_truthy())),
+        TokenType::BANG => Ok(Rc::new(RefCell::new(Literal::BOOL(!right.is_truthy())))),
         _ => Err(InterpreterError::Runtime {
             message: "Unhandled operator".to_string(),
             token: None,
@@ -82,11 +87,13 @@ pub fn eq(
     left: &Literal,
     right: &Literal,
     line: usize,
-) -> Result<Literal, InterpreterError> {
+) -> Result<RcMutLiteral, InterpreterError> {
     match (left, right) {
         (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) => match op {
-            TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
-            TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
+            TokenType::BangEqual => Ok(Rc::new(RefCell::new(Literal::BOOL(left_val != right_val)))),
+            TokenType::EqualEqual => {
+                Ok(Rc::new(RefCell::new(Literal::BOOL(left_val == right_val))))
+            }
             _ => Err(InterpreterError::Runtime {
                 message: "Unsupported equality operator".to_string(),
                 token: None,
@@ -95,8 +102,10 @@ pub fn eq(
             }),
         },
         (Literal::STRING(left_val), Literal::STRING(right_val)) => match op {
-            TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
-            TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
+            TokenType::BangEqual => Ok(Rc::new(RefCell::new(Literal::BOOL(left_val != right_val)))),
+            TokenType::EqualEqual => {
+                Ok(Rc::new(RefCell::new(Literal::BOOL(left_val == right_val))))
+            }
             _ => Err(InterpreterError::Runtime {
                 message: "Unsupported equality operator".to_string(),
                 token: None,
@@ -105,8 +114,10 @@ pub fn eq(
             }),
         },
         (Literal::BOOL(left_val), Literal::BOOL(right_val)) => match op {
-            TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
-            TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
+            TokenType::BangEqual => Ok(Rc::new(RefCell::new(Literal::BOOL(left_val != right_val)))),
+            TokenType::EqualEqual => {
+                Ok(Rc::new(RefCell::new(Literal::BOOL(left_val == right_val))))
+            }
             _ => Err(InterpreterError::Runtime {
                 message: "Unsupported equality operator".to_string(),
                 token: None,
@@ -114,25 +125,25 @@ pub fn eq(
                 hint: "Check the operator and try again".to_string(),
             }),
         },
-        _ => Ok(Literal::BOOL(false)),
+        _ => Ok(Rc::new(RefCell::new(Literal::BOOL(false)))),
     }
 }
 
 pub fn logical<'a>(
-    left: Cow<'a, Literal>,
-    right: Cow<'a, Literal>,
+    left: RcMutLiteral,
+    right: RcMutLiteral,
     op: &Token,
-) -> Result<Cow<'a, Literal>, InterpreterError> {
+) -> Result<RcMutLiteral, InterpreterError> {
     match op.token_type {
         TokenType::OR => {
-            if left.is_truthy() {
+            if left.borrow().is_truthy() {
                 Ok(left)
             } else {
                 Ok(right)
             }
         }
         TokenType::AND => {
-            if !left.is_truthy() {
+            if !left.borrow().is_truthy() {
                 Ok(left)
             } else {
                 Ok(right)

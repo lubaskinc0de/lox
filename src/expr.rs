@@ -19,7 +19,7 @@ pub enum Expr<'a> {
         right: Box<Expr<'a>>,
         op: &'a Token,
     },
-    Literal(&'a Literal),
+    Literal(Literal),
     Grouping(Box<Expr<'a>>),
     VarRead(&'a Token),
     Assign {

@@ -1,4 +1,8 @@
-use std::fmt::{self};
+use std::{
+    cell::RefCell,
+    fmt::{self},
+    rc::Rc,
+};
 
 use crate::error::InterpreterError;
 
@@ -145,3 +149,5 @@ impl Token {
         }
     }
 }
+
+pub type RcMutLiteral = Rc<RefCell<Literal>>;
