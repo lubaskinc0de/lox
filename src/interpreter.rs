@@ -110,7 +110,7 @@ impl Interpreter {
     }
 
     fn do_call(
-        calee: Box<dyn Callable>,
+        mut calee: Box<dyn Callable>,
         paren: &Token,
         args: &[Box<Expr>],
         env: RcMutEnv,

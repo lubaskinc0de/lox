@@ -38,6 +38,7 @@ fn run_file(file_name: &str) {
     run(&source, Rc::new(RefCell::new(env)), true);
 }
 
+#[allow(dead_code)]
 fn run_line(source: String) {
     let env = Environment::new(None);
     run(&source, Rc::new(RefCell::new(env)), true);

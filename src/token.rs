@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     fmt::{self},
-    rc::{Rc, Weak},
+    rc::Rc,
 };
 
 use crate::error::InterpreterError;
