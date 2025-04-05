@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    callable::Callable,
+    callable::{CallArgs, Callable},
     environment::{Environment, RcMutEnv},
     error::InterpreterError,
     expr::Expr,
@@ -11,12 +11,28 @@ use crate::{
     token::{Literal, RcMutLiteral, Token, TokenType},
 };
 
-pub struct Interpreter {}
+pub struct Interpreter {
+    pub globals: RcMutEnv,
+}
 
 impl Interpreter {
-    pub fn interpret(program: &[Stmt], globals: RcMutEnv) -> Result<(), InterpreterError> {
-        for stmt in program {
-            Interpreter::execute_statement(stmt, Rc::clone(&globals))?;
+    pub fn run(&self, program: &[&Stmt]) -> Result<(), InterpreterError> {
+        Interpreter::interpret(program, Rc::clone(&self.globals))
+    }
+
+    fn populate_builtins(&self) {
+        let credits_func = |_: CallArgs| rc_cell!(Literal::STRING(String::from("lubaskinc0de")));
+        let credits_func_token = Token {
+            token_type: TokenType::IDENTIFIER,
+            lexeme: String::from("credits()"),
+            literal: None,
+            line: 0,
+        };
+    }
+
+    pub fn interpret(code: &[&Stmt], env: RcMutEnv) -> Result<(), InterpreterError> {
+        for stmt in code {
+            Interpreter::execute_statement(stmt, Rc::clone(&env))?;
         }
         Ok(())
     }
@@ -32,7 +48,8 @@ impl Interpreter {
                 Interpreter::declare_variable(expr, name, Rc::clone(&env))
             }
             Stmt::Block(code) => {
-                Interpreter::block(code, env)?;
+                let block: Vec<&Stmt> = code.iter().map(|x| x).collect();
+                Interpreter::block(&block, env)?;
                 Ok(())
             }
             Stmt::If { cond, then, else_ } => {
@@ -74,7 +91,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn block(code: &[Stmt], outer: RcMutEnv) -> Result<(), InterpreterError> {
+    fn block(code: &[&Stmt], outer: RcMutEnv) -> Result<(), InterpreterError> {
         let env = Environment::new(Some(Rc::clone(&outer)));
         Interpreter::interpret(code, rc_cell!(env))?;
         Ok(())
@@ -110,6 +127,7 @@ impl Interpreter {
     }
 
     fn do_call(
+        &self,
         mut calee: Box<dyn Callable>,
         paren: &Token,
         args: &[Box<Expr>],
@@ -134,7 +152,7 @@ impl Interpreter {
                 hint: "Check arguments you pass".to_string(),
             });
         }
-        Ok(calee.do_call(args_evaluated.as_slice()))
+        Ok(calee.do_call(&self, args_evaluated)?)
     }
 
     fn eval<'a>(expr: &'a Expr, env: RcMutEnv) -> Result<RcMutLiteral, InterpreterError> {

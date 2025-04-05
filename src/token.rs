@@ -151,4 +151,3 @@ impl Token {
 }
 
 pub type RcMutLiteral = Rc<RefCell<Literal>>;
-

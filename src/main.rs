@@ -22,6 +22,7 @@ use environment::{Environment, RcMutEnv};
 use interpreter::Interpreter;
 use parser::Parser;
 use scanner::Scanner;
+use stmt::Stmt;
 
 fn read_file_to_string(file_name: &str) -> String {
     let mut buf = String::new();
@@ -71,8 +72,13 @@ fn run(line: &str, env: RcMutEnv, do_panic: bool) {
             }
         }
     };
+    let statements_refs: Vec<&Stmt> = statements.iter().map(|x| x).collect();
 
-    match Interpreter::interpret(&statements, Rc::clone(&env)) {
+    let interpreter = Interpreter {
+        globals: Rc::clone(&env),
+    };
+
+    match interpreter.run(&statements_refs) {
         Ok(_) => {}
         Err(e) => {
             if do_panic {

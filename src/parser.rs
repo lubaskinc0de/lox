@@ -3,13 +3,19 @@ use std::{borrow::Cow, cell::Cell, collections::HashMap, rc::Rc};
 use crate::{
     error::InterpreterError,
     expr::Expr,
-    stmt::Stmt,
+    stmt::{FunctionDeclaration, Stmt},
     token::{Literal, Token, TokenType},
 };
 
 pub struct Parser<'a> {
     tokens: &'a [Token],
     current: Cell<usize>,
+}
+
+#[derive(Debug)]
+pub enum FunctionKind {
+    Function,
+    Method,
 }
 
 impl<'a> Parser<'a> {
@@ -59,6 +65,9 @@ impl<'a> Parser<'a> {
         }
         if self.matches(&[TokenType::FOR]) {
             return self.for_stmt();
+        }
+        if self.matches(&[TokenType::FUN]) {
+            return self.function_stmt(FunctionKind::Function);
         }
 
         self.expression_stmt()
@@ -267,6 +276,62 @@ impl<'a> Parser<'a> {
         }
 
         Ok(body)
+    }
+
+    fn function_stmt(&self, kind: FunctionKind) -> Result<Stmt, InterpreterError> {
+        let name = self
+            .consume(TokenType::IDENTIFIER)
+            .ok_or(InterpreterError::Parser {
+                message: format!("Expected {kind:#?} name"),
+                token: self.peek().clone(),
+                line: self.peek().line,
+            })?;
+
+        self.consume(TokenType::LeftParen)
+            .ok_or(InterpreterError::Parser {
+                message: format!("Expected '(' after {kind:#?} name"),
+                token: name.clone(),
+                line: name.line,
+            })?;
+
+        let mut params: Vec<&Token> = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            loop {
+                let param =
+                    self.consume(TokenType::IDENTIFIER)
+                        .ok_or(InterpreterError::Parser {
+                            message: format!("Expected parameter name"),
+                            token: self.peek().clone(),
+                            line: self.peek().line,
+                        })?;
+                params.push(param);
+
+                if !self.matches(&[TokenType::COMMA]) {
+                    break;
+                }
+            }
+            self.consume(TokenType::RightParen)
+                .ok_or(InterpreterError::Parser {
+                    message: format!("Expected ')' after {kind:#?} params"),
+                    token: self.peek().clone(),
+                    line: self.peek().line,
+                })?;
+        };
+
+        self.consume(TokenType::LeftBrace)
+            .ok_or(InterpreterError::Parser {
+                message: format!("Expected '{{' before {kind:#?} body"),
+                token: self.peek().clone(),
+                line: self.peek().line,
+            })?;
+        let body = self.block_stmt()?;
+        let arity = params.len();
+        Ok(Stmt::Function(FunctionDeclaration {
+            name,
+            params,
+            arity,
+            body: Box::new(body),
+        }))
     }
 
     fn expression(&self) -> Result<Expr, InterpreterError> {

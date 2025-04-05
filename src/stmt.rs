@@ -1,6 +1,14 @@
 use crate::{expr::Expr, token::Token};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
+pub struct FunctionDeclaration<'a> {
+    pub name: &'a Token,
+    pub params: Vec<&'a Token>,
+    pub body: Box<Stmt<'a>>,
+    pub arity: usize,
+}
+
+#[derive(Debug)]
 pub enum Stmt<'a> {
     Expression(Expr<'a>),
     Print(Expr<'a>),
@@ -18,4 +26,5 @@ pub enum Stmt<'a> {
         cond: Expr<'a>,
         body: Box<Stmt<'a>>,
     },
+    Function(FunctionDeclaration<'a>),
 }
