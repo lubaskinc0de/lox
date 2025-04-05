@@ -4,6 +4,7 @@ mod error;
 mod expr;
 mod helper;
 mod interpreter;
+mod object;
 mod operator;
 mod parser;
 mod scanner;
@@ -60,15 +61,17 @@ fn run(line: &str, env: RcMutEnv, do_panic: bool) {
         }
     };
 
-    let parser = Parser::new(&tokens);
-    let statements = match parser.parse() {
-        Ok(v) => v,
-        Err(e) => {
-            if do_panic {
-                panic!("{}", e)
-            } else {
-                println!("{}", e);
-                return;
+    let statements = {
+        let parser = Parser::new(&tokens);
+        match parser.parse() {
+            Ok(v) => v,
+            Err(e) => {
+                if do_panic {
+                    panic!("{}", e)
+                } else {
+                    println!("{}", e);
+                    return;
+                }
             }
         }
     };
@@ -105,7 +108,8 @@ fn run_prompt() {
             break;
         }
 
-        run(&input, Rc::clone(&env), false);
+        let env_clone = Rc::clone(&env);
+        run(&input, env_clone, false);
     }
 }
 

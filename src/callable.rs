@@ -1,53 +1,32 @@
-use std::rc::Rc;
+use std::{fmt::Debug, rc::Rc};
 
 use crate::{
     environment::Environment,
     error::InterpreterError,
     interpreter::Interpreter,
+    object::Object,
     rc_cell,
     stmt::FunctionDeclaration,
-    token::{Literal, RcMutLiteral},
+    token::{Literal, RcMutObject},
 };
 
-pub type CallArgs = Vec<RcMutLiteral>;
-pub type CallReturn = Result<RcMutLiteral, InterpreterError>;
+pub type CallArgs<'a> = Vec<RcMutObject<'a>>;
+pub type CallReturn<'a> = Result<RcMutObject<'a>, InterpreterError>;
 
-pub trait Callable {
-    fn do_call(&mut self, interpreter: &Interpreter, args: CallArgs) -> CallReturn;
+pub trait LoxCallable<'a>: Debug {
+    fn do_call(&mut self, interpreter: &Interpreter<'a>, args: CallArgs<'a>) -> CallReturn<'a>;
 
     fn arity(&self) -> usize;
 }
 
 #[allow(dead_code)]
-struct BuiltinFunction<F>
-where
-    F: FnMut(CallArgs) -> CallReturn,
-{
-    arity: usize,
-    callable: F,
+#[derive(Debug)]
+pub struct DeclaredFunction<'a> {
+    pub declaration: &'a FunctionDeclaration<'a>,
 }
 
-impl<F> Callable for BuiltinFunction<F>
-where
-    F: FnMut(CallArgs) -> CallReturn,
-{
-    fn do_call(&mut self, _interpreter: &Interpreter, args: CallArgs) -> CallReturn {
-        let func = &mut self.callable;
-        func(args)
-    }
-
-    fn arity(&self) -> usize {
-        self.arity
-    }
-}
-
-#[allow(dead_code)]
-struct DeclaredFunction<'a> {
-    pub declaration: FunctionDeclaration<'a>,
-}
-
-impl<'a> Callable for DeclaredFunction<'a> {
-    fn do_call(&mut self, interpreter: &Interpreter, mut args: CallArgs) -> CallReturn {
+impl<'a> LoxCallable<'a> for DeclaredFunction<'a> {
+    fn do_call(&mut self, interpreter: &Interpreter<'a>, mut args: CallArgs<'a>) -> CallReturn<'a> {
         if args.len() != self.arity() {
             return Err(InterpreterError::Runtime {
                 message: "Not enough arguments".to_string(),
@@ -66,7 +45,7 @@ impl<'a> Callable for DeclaredFunction<'a> {
 
         let body = &*self.declaration.body;
         Interpreter::interpret(&[body], rc_cell!(env))?;
-        Ok(rc_cell!(Literal::NIL))
+        Ok(rc_cell!(Object::Literal(rc_cell!(Literal::NIL))))
     }
 
     fn arity(&self) -> usize {

@@ -69,13 +69,11 @@ pub fn cmp(op: &TokenType, left: &f64, right: &f64, line: usize) -> LitResult {
     }
 }
 
-pub fn eq(op: &TokenType, left: &Literal, right: &Literal, line: usize) -> RcMutLitResult {
+pub fn eq(op: &TokenType, left: &Literal, right: &Literal, line: usize) -> LitResult {
     match (left, right) {
         (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) => match op {
-            TokenType::BangEqual => Ok(Rc::new(RefCell::new(Literal::BOOL(left_val != right_val)))),
-            TokenType::EqualEqual => {
-                Ok(Rc::new(RefCell::new(Literal::BOOL(left_val == right_val))))
-            }
+            TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
+            TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
             _ => Err(InterpreterError::Runtime {
                 message: "Unsupported equality operator".to_string(),
                 token: None,
@@ -84,10 +82,8 @@ pub fn eq(op: &TokenType, left: &Literal, right: &Literal, line: usize) -> RcMut
             }),
         },
         (Literal::STRING(left_val), Literal::STRING(right_val)) => match op {
-            TokenType::BangEqual => Ok(Rc::new(RefCell::new(Literal::BOOL(left_val != right_val)))),
-            TokenType::EqualEqual => {
-                Ok(Rc::new(RefCell::new(Literal::BOOL(left_val == right_val))))
-            }
+            TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
+            TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
             _ => Err(InterpreterError::Runtime {
                 message: "Unsupported equality operator".to_string(),
                 token: None,
@@ -96,10 +92,8 @@ pub fn eq(op: &TokenType, left: &Literal, right: &Literal, line: usize) -> RcMut
             }),
         },
         (Literal::BOOL(left_val), Literal::BOOL(right_val)) => match op {
-            TokenType::BangEqual => Ok(Rc::new(RefCell::new(Literal::BOOL(left_val != right_val)))),
-            TokenType::EqualEqual => {
-                Ok(Rc::new(RefCell::new(Literal::BOOL(left_val == right_val))))
-            }
+            TokenType::BangEqual => Ok(Literal::BOOL(left_val != right_val)),
+            TokenType::EqualEqual => Ok(Literal::BOOL(left_val == right_val)),
             _ => Err(InterpreterError::Runtime {
                 message: "Unsupported equality operator".to_string(),
                 token: None,
@@ -107,11 +101,15 @@ pub fn eq(op: &TokenType, left: &Literal, right: &Literal, line: usize) -> RcMut
                 hint: "Check the operator and try again".to_string(),
             }),
         },
-        _ => Ok(Rc::new(RefCell::new(Literal::BOOL(false)))),
+        _ => Ok(Literal::BOOL(false)),
     }
 }
 
-pub fn logical<'a>(left: RcMutLiteral, right: RcMutLiteral, op: &Token) -> RcMutLitResult {
+pub fn logical<'a>(
+    left: RcMutLiteral,
+    right: RcMutLiteral,
+    op: &Token,
+) -> Result<RcMutLiteral, InterpreterError> {
     match op.token_type {
         TokenType::OR => {
             if left.borrow().is_truthy() {

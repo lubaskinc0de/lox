@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::error::InterpreterError;
+use crate::{error::InterpreterError, object::Object};
 
 #[derive(Debug, Clone, PartialEq, Eq, Copy, Hash)]
 #[allow(dead_code)]
@@ -151,3 +151,4 @@ impl Token {
 }
 
 pub type RcMutLiteral = Rc<RefCell<Literal>>;
+pub type RcMutObject<'a> = Rc<RefCell<Object<'a>>>;
