@@ -1,12 +1,12 @@
 use std::rc::Rc;
 
 use crate::{
-    callable::{CallArgs, DeclaredFunction, LoxCallable},
+    callable::{CallArgs, DeclaredFunction},
     environment::{Environment, RcMutEnv},
     error::InterpreterError,
     expr::Expr,
     helper::{RcMutObjectResult, VoidResult},
-    object::Object,
+    object::{LoxFn, Object},
     operator::{calc, cmp, eq, logical, unary},
     rc_cell,
     stmt::{FunctionDeclaration, Stmt},
@@ -17,8 +17,11 @@ pub struct Interpreter<'b> {
     pub globals: RcMutEnv<'b>,
 }
 
-impl<'a, 'b> Interpreter<'b> where 'a:'b {
-    pub fn run(&self, program: &[&'a Stmt]) -> VoidResult{
+impl<'a, 'b> Interpreter<'b>
+where
+    'a: 'b,
+{
+    pub fn run(&self, program: &[&'a Stmt]) -> VoidResult {
         Interpreter::interpret(program, Rc::clone(&self.globals))
     }
 
@@ -64,7 +67,7 @@ impl<'a, 'b> Interpreter<'b> where 'a:'b {
                 Interpreter::while_(cond, body, env)?;
                 Ok(())
             }
-            Stmt::Function(_decl) => todo!(),
+            Stmt::Function(decl) => Interpreter::function_declaration(decl, env),
         }?;
         Ok(())
     }
@@ -131,8 +134,7 @@ impl<'a, 'b> Interpreter<'b> where 'a:'b {
 
     #[allow(dead_code)]
     fn do_call(
-        &'a self,
-        mut calee: Box<dyn LoxCallable<'a>>,
+        calee: LoxFn<'a>,
         paren: &Token,
         args: &'a [Box<Expr<'a>>],
         env: RcMutEnv<'a>,
@@ -144,11 +146,11 @@ impl<'a, 'b> Interpreter<'b> where 'a:'b {
             args_evaluated.push(evaluated);
         }
 
-        if args.len() != calee.arity() {
+        if args.len() != calee.borrow().arity() {
             return Err(InterpreterError::Runtime {
                 message: format!(
                     "Expected {} arguments but got {}",
-                    calee.arity(),
+                    calee.borrow().arity(),
                     args.len()
                 ),
                 token: Some(paren.clone()),
@@ -156,32 +158,18 @@ impl<'a, 'b> Interpreter<'b> where 'a:'b {
                 hint: "Check arguments you pass".to_string(),
             });
         }
-        Ok(calee.do_call(&self, args_evaluated)?)
+        Ok(calee.borrow_mut().do_call(env, args_evaluated)?)
     }
 
-    fn function_declaration(decl: &FunctionDeclaration, env: RcMutEnv) -> VoidResult {
+    fn function_declaration(decl: &'a FunctionDeclaration, env: RcMutEnv<'a>) -> VoidResult {
         let func = DeclaredFunction { declaration: decl };
-        let obj = Object::Function(Box::new(func));
+        let obj = Object::Function(rc_cell!(func));
+        env.borrow_mut().define(decl.name, Some(rc_cell!(obj)))?;
         Ok(())
     }
 
     fn eval(expr: &'a Expr, env: RcMutEnv<'a>) -> RcMutObjectResult<'a> {
         match expr {
-            Expr::VarRead(token) => {
-                let var = env.borrow().get(&token)?;
-                Ok(var.clone())
-            }
-            Expr::Assign { name, value } => {
-                let evaluated = Interpreter::eval(&*value, Rc::clone(&env))?;
-                let scalar = Some(evaluated);
-                let ret = env.borrow_mut().assign(name, scalar)?;
-                Ok(ret.clone())
-            }
-            Expr::Call {
-                calee: _,
-                paren: _,
-                args: _,
-            } => todo!(),
             Expr::Literal(val) => Ok(rc_cell!(Object::Literal(rc_cell!(val.clone())))),
             Expr::Grouping(expr) => Interpreter::eval(&*expr, env),
             Expr::Unary { right, op } => {
@@ -314,6 +302,22 @@ impl<'a, 'b> Interpreter<'b> where 'a:'b {
                 let right_lit = Interpreter::eval(&*right, env)?.borrow().extract_literal();
                 let lit = logical(left_lit, right_lit, op)?;
                 Ok(rc_cell!(Object::Literal(lit)))
+            }
+            Expr::VarRead(token) => {
+                let var = env.borrow().get(&token)?;
+                Ok(var.clone())
+            }
+            Expr::Assign { name, value } => {
+                let evaluated = Interpreter::eval(&*value, Rc::clone(&env))?;
+                let scalar = Some(evaluated);
+                let ret = env.borrow_mut().assign(name, scalar)?;
+                Ok(ret.clone())
+            }
+            Expr::Call { calee, paren, args } => {
+                let evaluated_calee = Interpreter::eval(&calee, env.clone())?;
+                let lox_fn = evaluated_calee.borrow().extract_fn();
+                let result = Interpreter::do_call(lox_fn, paren, args, env)?;
+                Ok(result)
             }
         }
     }

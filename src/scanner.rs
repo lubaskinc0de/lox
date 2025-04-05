@@ -1,11 +1,13 @@
 use crate::{
-    error::InterpreterError, helper::VoidResult, token::{Literal, Token, TokenType}
+    error::InterpreterError,
+    helper::VoidResult,
+    token::{Literal, Token, TokenType},
 };
 use std::{collections::HashMap, rc::Rc, vec};
 
 #[allow(dead_code)]
-pub struct Scanner {
-    source: String,
+pub struct Scanner<'a> {
+    source: &'a str,
     tokens: Vec<Token>,
     start: usize,
     current: usize,
@@ -14,10 +16,10 @@ pub struct Scanner {
     keywords: HashMap<String, TokenType>,
 }
 
-impl Scanner {
-    pub fn new(source: &str) -> Self {
+impl<'a> Scanner<'a> {
+    pub fn new(source: &'a str) -> Self {
         Self {
-            source: source.to_string(),
+            source: source,
             tokens: vec![],
             start: 0,
             current: 0,

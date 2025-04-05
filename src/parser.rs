@@ -7,8 +7,8 @@ use crate::{
     token::{Literal, Token, TokenType},
 };
 
-pub struct Parser<'a> {
-    tokens: &'a [Token],
+pub struct Parser {
+    tokens: Vec<Token>,
     current: Cell<usize>,
 }
 
@@ -22,8 +22,8 @@ pub enum FunctionKind {
 type StmtResult<'a> = Result<Stmt<'a>, InterpreterError>;
 type ExprResult<'a> = Result<Expr<'a>, InterpreterError>;
 
-impl<'a> Parser<'a> {
-    pub fn new(tokens: &'a [Token]) -> Self {
+impl Parser {
+    pub fn new(tokens: Vec<Token>) -> Self {
         if tokens.is_empty() {
             panic!("Cannot initialize parser with empty tokens")
         }
@@ -541,8 +541,6 @@ impl<'a> Parser<'a> {
         calee: Expr<'b>,
         left_paren: &Token,
     ) -> Result<Expr<'b>, InterpreterError>
-    where
-        'a: 'b,
     {
         let mut args: Vec<Box<Expr>> = Vec::new();
         if !self.check(TokenType::RightParen) {

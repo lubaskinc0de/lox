@@ -1,7 +1,7 @@
 use std::{fmt::Debug, rc::Rc};
 
 use crate::{
-    environment::Environment,
+    environment::{Environment, RcMutEnv},
     error::InterpreterError,
     interpreter::Interpreter,
     object::Object,
@@ -14,7 +14,7 @@ pub type CallArgs<'a> = Vec<RcMutObject<'a>>;
 pub type CallReturn<'a> = Result<RcMutObject<'a>, InterpreterError>;
 
 pub trait LoxCallable<'a>: Debug {
-    fn do_call(&mut self, interpreter: &Interpreter<'a>, args: CallArgs<'a>) -> CallReturn<'a>;
+    fn do_call(&mut self, globals: RcMutEnv<'a>, args: CallArgs<'a>) -> CallReturn<'a>;
 
     fn arity(&self) -> usize;
 }
@@ -26,7 +26,7 @@ pub struct DeclaredFunction<'a> {
 }
 
 impl<'a> LoxCallable<'a> for DeclaredFunction<'a> {
-    fn do_call(&mut self, interpreter: &Interpreter<'a>, mut args: CallArgs<'a>) -> CallReturn<'a> {
+    fn do_call(&mut self, globals: RcMutEnv<'a>, args: CallArgs<'a>) -> CallReturn<'a> {
         if args.len() != self.arity() {
             return Err(InterpreterError::Runtime {
                 message: "Not enough arguments".to_string(),
@@ -35,12 +35,11 @@ impl<'a> LoxCallable<'a> for DeclaredFunction<'a> {
                 hint: "".to_string(),
             });
         }
-        let mut env = Environment::new(Some(Rc::clone(&interpreter.globals)));
+        let mut env = Environment::new(Some(Rc::clone(&globals)));
 
         for i in 0..self.declaration.params.len() {
             let param = self.declaration.params.get(i).unwrap();
-            let arg_value = args.remove(i);
-            env.define(&param, Some(arg_value))?;
+            env.define(&param, Some(args[i].clone()))?;
         }
 
         let body = &*self.declaration.body;
