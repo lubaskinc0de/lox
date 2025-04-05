@@ -13,8 +13,8 @@ use crate::{
     token::{Literal, RcMutObject, Token, TokenType},
 };
 
-pub struct Interpreter<'a> {
-    pub globals: RcMutEnv<'a>,
+pub struct Interpreter<'b> {
+    pub globals: RcMutEnv<'b>,
 }
 
 impl<'a> Interpreter<'a> {

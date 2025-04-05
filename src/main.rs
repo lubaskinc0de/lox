@@ -61,17 +61,15 @@ fn run(line: &str, env: RcMutEnv, do_panic: bool) {
         }
     };
 
-    let statements = {
-        let parser = Parser::new(&tokens);
-        match parser.parse() {
-            Ok(v) => v,
-            Err(e) => {
-                if do_panic {
-                    panic!("{}", e)
-                } else {
-                    println!("{}", e);
-                    return;
-                }
+    let parser = Parser::new(&tokens);
+    let statements = match parser.parse() {
+        Ok(v) => v,
+        Err(e) => {
+            if do_panic {
+                panic!("{}", e)
+            } else {
+                println!("{}", e);
+                return;
             }
         }
     };
