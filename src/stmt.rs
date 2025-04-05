@@ -1,5 +1,6 @@
 use crate::{expr::Expr, token::Token};
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct FunctionDeclaration<'a> {
     pub name: &'a Token,

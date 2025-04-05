@@ -13,10 +13,14 @@ pub struct Parser<'a> {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum FunctionKind {
     Function,
     Method,
 }
+
+type StmtResult<'a> = Result<Stmt<'a>, InterpreterError>;
+type ExprResult<'a> = Result<Expr<'a>, InterpreterError>;
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: &'a [Token]) -> Self {
@@ -44,7 +48,7 @@ impl<'a> Parser<'a> {
         Ok(stmts)
     }
 
-    fn statement(&self) -> Result<Stmt, InterpreterError> {
+    fn statement(&self) -> StmtResult {
         if self.matches(&[TokenType::VAR]) {
             return self.var_stmt();
         }
@@ -85,19 +89,19 @@ impl<'a> Parser<'a> {
             })
     }
 
-    fn print_stmt(&self) -> Result<Stmt, InterpreterError> {
+    fn print_stmt(&self) -> StmtResult {
         let expr = self.expression()?;
         self.expect_semicolon()?;
         Ok(Stmt::Print(expr))
     }
 
-    fn expression_stmt(&self) -> Result<Stmt, InterpreterError> {
+    fn expression_stmt(&self) -> StmtResult {
         let expr = self.expression()?;
         self.expect_semicolon()?;
         return Ok(Stmt::Expression(expr));
     }
 
-    fn block_stmt(&self) -> Result<Stmt, InterpreterError> {
+    fn block_stmt(&self) -> StmtResult {
         let mut code: Vec<Stmt> = vec![];
 
         while !self.check(TokenType::RightBrace) {
@@ -118,7 +122,7 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Block(code))
     }
 
-    fn var_stmt(&self) -> Result<Stmt, InterpreterError> {
+    fn var_stmt(&self) -> StmtResult {
         let token = self.peek();
         let line = token.line;
 
@@ -144,7 +148,7 @@ impl<'a> Parser<'a> {
         });
     }
 
-    fn if_stmt(&self) -> Result<Stmt, InterpreterError> {
+    fn if_stmt(&self) -> StmtResult {
         let l_paren = self.consume(TokenType::LeftParen);
         let mut peek = self.peek();
         let mut line = peek.line;
@@ -183,7 +187,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn while_stmt(&self) -> Result<Stmt, InterpreterError> {
+    fn while_stmt(&self) -> StmtResult {
         let l_paren = self.consume(TokenType::LeftParen);
         let mut peek = self.peek();
         let mut line = peek.line;
@@ -216,7 +220,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn for_stmt(&self) -> Result<Stmt, InterpreterError> {
+    fn for_stmt(&self) -> StmtResult {
         let l_paren = self.consume(TokenType::LeftParen);
         let mut peek = self.peek();
         let mut line = peek.line;
@@ -278,7 +282,7 @@ impl<'a> Parser<'a> {
         Ok(body)
     }
 
-    fn function_stmt(&self, kind: FunctionKind) -> Result<Stmt, InterpreterError> {
+    fn function_stmt(&self, kind: FunctionKind) -> StmtResult {
         let name = self
             .consume(TokenType::IDENTIFIER)
             .ok_or(InterpreterError::Parser {
@@ -334,11 +338,11 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    fn expression(&self) -> Result<Expr, InterpreterError> {
+    fn expression(&self) -> ExprResult {
         self.assignment()
     }
 
-    fn assignment(&self) -> Result<Expr, InterpreterError> {
+    fn assignment(&self) -> ExprResult {
         let expr = self.or()?;
 
         if self.matches(&[TokenType::EQUAL]) {
@@ -403,7 +407,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn or(&self) -> Result<Expr, InterpreterError> {
+    fn or(&self) -> ExprResult {
         let mut expr = self.and()?;
 
         while self.matches(&[TokenType::OR]) {
@@ -419,7 +423,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn and(&self) -> Result<Expr, InterpreterError> {
+    fn and(&self) -> ExprResult {
         let mut expr = self.equality()?;
 
         while self.matches(&[TokenType::AND]) {
@@ -435,7 +439,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn equality(&self) -> Result<Expr, InterpreterError> {
+    fn equality(&self) -> ExprResult {
         let mut expr = self.comparison()?;
 
         while self.matches(&[TokenType::EqualEqual, TokenType::BangEqual]) {
@@ -450,7 +454,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn comparison(&self) -> Result<Expr, InterpreterError> {
+    fn comparison(&self) -> ExprResult {
         let mut expr = self.term()?;
         while self.matches(&[
             TokenType::LESS,
@@ -469,7 +473,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn term(&self) -> Result<Expr, InterpreterError> {
+    fn term(&self) -> ExprResult {
         let mut expr = self.factor()?;
         while self.matches(&[TokenType::MINUS, TokenType::PLUS]) {
             let op = self.prev();
@@ -483,7 +487,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn factor(&self) -> Result<Expr, InterpreterError> {
+    fn factor(&self) -> ExprResult {
         let mut expr = self.unary()?;
         while self.matches(&[TokenType::STAR, TokenType::SLASH]) {
             let op = self.prev();
@@ -497,7 +501,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn unary(&self) -> Result<Expr, InterpreterError> {
+    fn unary(&self) -> ExprResult {
         if self.matches(&[TokenType::BANG, TokenType::MINUS]) {
             let op = self.prev();
             let right = self.unary()?;
@@ -509,7 +513,7 @@ impl<'a> Parser<'a> {
         self.pow()
     }
 
-    fn pow(&self) -> Result<Expr, InterpreterError> {
+    fn pow(&self) -> ExprResult {
         let mut expr = self.call()?;
         while self.matches(&[TokenType::Pow]) {
             let op = self.prev();
@@ -523,7 +527,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn call(&self) -> Result<Expr, InterpreterError> {
+    fn call(&self) -> ExprResult {
         let mut expr = self.primary()?;
 
         while self.matches(&[TokenType::LeftParen]) {
@@ -563,7 +567,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn primary(&self) -> Result<Expr, InterpreterError> {
+    fn primary(&self) -> ExprResult {
         if self.matches(&[TokenType::FALSE]) {
             return Ok(Expr::Literal(Literal::BOOL(false)));
         }

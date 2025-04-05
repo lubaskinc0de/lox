@@ -18,6 +18,7 @@ pub trait Callable {
     fn arity(&self) -> usize;
 }
 
+#[allow(dead_code)]
 struct BuiltinFunction<F>
 where
     F: FnMut(CallArgs) -> CallReturn,
@@ -40,6 +41,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 struct DeclaredFunction<'a> {
     pub declaration: FunctionDeclaration<'a>,
 }
@@ -59,11 +61,11 @@ impl<'a> Callable for DeclaredFunction<'a> {
         for i in 0..self.declaration.params.len() {
             let param = self.declaration.params.get(i).unwrap();
             let arg_value = args.remove(i);
-            env.define(&param, Some(arg_value));
+            env.define(&param, Some(arg_value))?;
         }
 
         let body = &*self.declaration.body;
-        Interpreter::interpret(&[body], rc_cell!(env));
+        Interpreter::interpret(&[body], rc_cell!(env))?;
         Ok(rc_cell!(Literal::NIL))
     }
 

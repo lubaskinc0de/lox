@@ -5,6 +5,7 @@ use crate::{
     environment::{Environment, RcMutEnv},
     error::InterpreterError,
     expr::Expr,
+    helper::{RcMutLitResult, VoidResult},
     operator::{calc, cmp, eq, logical, unary},
     rc_cell,
     stmt::Stmt,
@@ -16,13 +17,14 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn run(&self, program: &[&Stmt]) -> Result<(), InterpreterError> {
+    pub fn run(&self, program: &[&Stmt]) -> VoidResult {
         Interpreter::interpret(program, Rc::clone(&self.globals))
     }
 
+    #[allow(dead_code)]
     fn populate_builtins(&self) {
-        let credits_func = |_: CallArgs| rc_cell!(Literal::STRING(String::from("lubaskinc0de")));
-        let credits_func_token = Token {
+        let _credits_func = |_: CallArgs| rc_cell!(Literal::STRING(String::from("lubaskinc0de")));
+        let _credits_func_token = Token {
             token_type: TokenType::IDENTIFIER,
             lexeme: String::from("credits()"),
             literal: None,
@@ -30,14 +32,14 @@ impl Interpreter {
         };
     }
 
-    pub fn interpret(code: &[&Stmt], env: RcMutEnv) -> Result<(), InterpreterError> {
+    pub fn interpret(code: &[&Stmt], env: RcMutEnv) -> VoidResult {
         for stmt in code {
             Interpreter::execute_statement(stmt, Rc::clone(&env))?;
         }
         Ok(())
     }
 
-    fn execute_statement(stmt: &Stmt, env: RcMutEnv) -> Result<(), InterpreterError> {
+    fn execute_statement(stmt: &Stmt, env: RcMutEnv) -> VoidResult {
         match stmt {
             Stmt::Expression(expr) => Interpreter::eval(expr, Rc::clone(&env)).map(|_| {}),
             Stmt::Print(expr) => {
@@ -61,6 +63,7 @@ impl Interpreter {
                 Interpreter::while_(cond, body, env)?;
                 Ok(())
             }
+            Stmt::Function(_decl) => todo!(),
         }?;
         Ok(())
     }
@@ -75,11 +78,7 @@ impl Interpreter {
         }
     }
 
-    fn declare_variable(
-        expr: &Option<Expr>,
-        name: &Token,
-        env: RcMutEnv,
-    ) -> Result<(), InterpreterError> {
+    fn declare_variable(expr: &Option<Expr>, name: &Token, env: RcMutEnv) -> VoidResult {
         let mut right: Option<RcMutLiteral> = None;
 
         if let Some(t_expr) = expr {
@@ -91,18 +90,13 @@ impl Interpreter {
         Ok(())
     }
 
-    fn block(code: &[&Stmt], outer: RcMutEnv) -> Result<(), InterpreterError> {
+    fn block(code: &[&Stmt], outer: RcMutEnv) -> VoidResult {
         let env = Environment::new(Some(Rc::clone(&outer)));
         Interpreter::interpret(code, rc_cell!(env))?;
         Ok(())
     }
 
-    fn if_(
-        cond: &Expr,
-        then: &Stmt,
-        else_: Option<&Stmt>,
-        env: RcMutEnv,
-    ) -> Result<(), InterpreterError> {
+    fn if_(cond: &Expr, then: &Stmt, else_: Option<&Stmt>, env: RcMutEnv) -> VoidResult {
         {
             let cond_eval = Interpreter::eval(cond, Rc::clone(&env))?;
             if cond_eval.borrow().is_truthy() {
@@ -114,7 +108,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn while_(cond: &Expr, body: &Stmt, env: RcMutEnv) -> Result<(), InterpreterError> {
+    fn while_(cond: &Expr, body: &Stmt, env: RcMutEnv) -> VoidResult {
         loop {
             let cond_eval = { Interpreter::eval(cond, Rc::clone(&env))? };
 
@@ -126,13 +120,14 @@ impl Interpreter {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn do_call(
         &self,
         mut calee: Box<dyn Callable>,
         paren: &Token,
         args: &[Box<Expr>],
         env: RcMutEnv,
-    ) -> Result<RcMutLiteral, InterpreterError> {
+    ) -> RcMutLitResult {
         let mut args_evaluated: Vec<RcMutLiteral> = Vec::new();
 
         for each in args {
@@ -155,7 +150,7 @@ impl Interpreter {
         Ok(calee.do_call(&self, args_evaluated)?)
     }
 
-    fn eval<'a>(expr: &'a Expr, env: RcMutEnv) -> Result<RcMutLiteral, InterpreterError> {
+    fn eval<'a>(expr: &'a Expr, env: RcMutEnv) -> RcMutLitResult {
         match expr {
             Expr::Literal(val) => Ok(rc_cell!(val.clone())),
             Expr::Grouping(expr) => Interpreter::eval(&*expr, env),
@@ -287,7 +282,11 @@ impl Interpreter {
                 let ret = env.borrow_mut().assign(name, scalar)?;
                 Ok(ret)
             }
-            Expr::Call { calee, paren, args } => todo!(),
+            Expr::Call {
+                calee: _,
+                paren: _,
+                args: _,
+            } => todo!(),
         }
     }
 }

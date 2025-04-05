@@ -2,14 +2,11 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     error::InterpreterError,
+    helper::{LitResult, RcMutLitResult},
     token::{Literal, RcMutLiteral, Token, TokenType},
 };
 
-pub fn unary(
-    op: &TokenType,
-    right: &Literal,
-    line: usize,
-) -> Result<RcMutLiteral, InterpreterError> {
+pub fn unary(op: &TokenType, right: &Literal, line: usize) -> RcMutLitResult {
     match op {
         TokenType::MINUS => match right {
             Literal::NUMBER(number) => Ok(Rc::new(RefCell::new(Literal::NUMBER(-number)))),
@@ -30,12 +27,7 @@ pub fn unary(
     }
 }
 
-pub fn calc(
-    op: &TokenType,
-    left: &f64,
-    right: &f64,
-    line: usize,
-) -> Result<Literal, InterpreterError> {
+pub fn calc(op: &TokenType, left: &f64, right: &f64, line: usize) -> LitResult {
     match op {
         TokenType::MINUS => Ok(Literal::NUMBER(left - right)),
         TokenType::PLUS => Ok(Literal::NUMBER(left + right)),
@@ -62,12 +54,7 @@ pub fn calc(
     }
 }
 
-pub fn cmp(
-    op: &TokenType,
-    left: &f64,
-    right: &f64,
-    line: usize,
-) -> Result<Literal, InterpreterError> {
+pub fn cmp(op: &TokenType, left: &f64, right: &f64, line: usize) -> LitResult {
     match op {
         TokenType::LESS => Ok(Literal::BOOL(left < right)),
         TokenType::GREATER => Ok(Literal::BOOL(left > right)),
@@ -82,12 +69,7 @@ pub fn cmp(
     }
 }
 
-pub fn eq(
-    op: &TokenType,
-    left: &Literal,
-    right: &Literal,
-    line: usize,
-) -> Result<RcMutLiteral, InterpreterError> {
+pub fn eq(op: &TokenType, left: &Literal, right: &Literal, line: usize) -> RcMutLitResult {
     match (left, right) {
         (Literal::NUMBER(left_val), Literal::NUMBER(right_val)) => match op {
             TokenType::BangEqual => Ok(Rc::new(RefCell::new(Literal::BOOL(left_val != right_val)))),
@@ -129,11 +111,7 @@ pub fn eq(
     }
 }
 
-pub fn logical<'a>(
-    left: RcMutLiteral,
-    right: RcMutLiteral,
-    op: &Token,
-) -> Result<RcMutLiteral, InterpreterError> {
+pub fn logical<'a>(left: RcMutLiteral, right: RcMutLiteral, op: &Token) -> RcMutLitResult {
     match op.token_type {
         TokenType::OR => {
             if left.borrow().is_truthy() {

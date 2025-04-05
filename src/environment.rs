@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::error::InterpreterError;
+use crate::helper::{RcMutLitResult, VoidResult};
 use crate::rc_cell;
 use crate::token::{Literal, RcMutLiteral, Token};
 
@@ -22,11 +23,7 @@ impl Environment {
         }
     }
 
-    pub fn define(
-        &mut self,
-        name: &Token,
-        value: Option<RcMutLiteral>,
-    ) -> Result<(), InterpreterError> {
+    pub fn define(&mut self, name: &Token, value: Option<RcMutLiteral>) -> VoidResult {
         let id = name.expect_identifier()?;
         if self.values.contains_key(id.as_str()) {
             return Err(InterpreterError::Runtime {
@@ -41,7 +38,7 @@ impl Environment {
         Ok(())
     }
 
-    pub fn get(&self, name: &Token) -> Result<RcMutLiteral, InterpreterError> {
+    pub fn get(&self, name: &Token) -> RcMutLitResult {
         let var_name = name.expect_identifier()?;
         if let Some(val) = self.values.get(&var_name) {
             return Ok(Rc::clone(&val));
@@ -58,11 +55,7 @@ impl Environment {
         })
     }
 
-    pub fn assign(
-        &mut self,
-        name: &Token,
-        value: Option<RcMutLiteral>,
-    ) -> Result<RcMutLiteral, InterpreterError> {
+    pub fn assign(&mut self, name: &Token, value: Option<RcMutLiteral>) -> RcMutLitResult {
         let id = name.expect_identifier()?;
 
         if self.values.contains_key(&id) {

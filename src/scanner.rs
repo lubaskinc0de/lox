@@ -1,6 +1,5 @@
 use crate::{
-    error::InterpreterError,
-    token::{Literal, Token, TokenType},
+    error::InterpreterError, helper::VoidResult, token::{Literal, Token, TokenType}
 };
 use std::{collections::HashMap, rc::Rc, vec};
 
@@ -45,7 +44,7 @@ impl Scanner {
         }
     }
 
-    fn scan_token(&mut self) -> Result<(), InterpreterError> {
+    fn scan_token(&mut self) -> VoidResult {
         let c = self.advance();
         match c {
             '(' => Ok(self.add_token(TokenType::LeftParen, None)),
@@ -299,7 +298,7 @@ impl Scanner {
         }
     }
 
-    fn string(&mut self) -> Result<(), InterpreterError> {
+    fn string(&mut self) -> VoidResult {
         loop {
             let peek = self.peek();
 
@@ -327,7 +326,7 @@ impl Scanner {
         Ok(())
     }
 
-    fn number(&mut self) -> Result<(), InterpreterError> {
+    fn number(&mut self) -> VoidResult {
         loop {
             let peek = self.peek();
 
