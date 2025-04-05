@@ -17,8 +17,8 @@ pub struct Interpreter<'b> {
     pub globals: RcMutEnv<'b>,
 }
 
-impl<'a> Interpreter<'a> {
-    pub fn run(&self, program: &[&'a Stmt]) -> VoidResult {
+impl<'a, 'b> Interpreter<'b> where 'a:'b {
+    pub fn run(&self, program: &[&'a Stmt]) -> VoidResult{
         Interpreter::interpret(program, Rc::clone(&self.globals))
     }
 
