@@ -13,5 +13,3 @@ lto = "thin"
 codegen-units = 1
 panic = 'abort'
 strip = true
-jemalloc = true
-codegen-units-std = 1

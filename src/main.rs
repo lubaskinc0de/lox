@@ -35,7 +35,7 @@ fn main() {
         panic!("REPL is not supported yet.");
     }
 
-    let runtime = Runtime::new();
+    let runtime = Runtime();
 
     match file_name {
         Some(f_name) => runtime.run(&f_name),

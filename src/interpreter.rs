@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{collections::VecDeque, rc::Rc};
 
 use crate::{
     callable::{CallArgs, DeclaredFunction},
@@ -139,11 +139,11 @@ where
         args: &'a [Box<Expr<'a>>],
         env: RcMutEnv<'a>,
     ) -> RcMutObjectResult<'a> {
-        let mut args_evaluated: Vec<RcMutObject> = Vec::new();
+        let mut args_evaluated: VecDeque<RcMutObject> = VecDeque::new();
 
         for each in args {
             let evaluated = Interpreter::eval(&each, Rc::clone(&env))?;
-            args_evaluated.push(evaluated);
+            args_evaluated.push_back(evaluated);
         }
 
         if args.len() != calee.borrow().arity() {

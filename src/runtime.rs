@@ -1,7 +1,7 @@
 use std::{fs::File, io::Read};
 
 use crate::{
-    environment::{Environment, RcMutEnv},
+    environment::Environment,
     error::InterpreterError,
     interpreter::Interpreter,
     parser::Parser,
@@ -20,21 +20,9 @@ fn read_file_to_string(file_name: &str) -> String {
 }
 
 #[allow(dead_code)]
-pub struct Runtime<'a> {
-    globals: RcMutEnv<'a>,
-    statements: Vec<Box<Vec<Stmt<'a>>>>,
-    parsers: Vec<Parser>,
-}
+pub struct Runtime();
 
-impl<'a> Runtime<'a> {
-    pub fn new() -> Self {
-        Self {
-            globals: rc_cell!(Environment::new(None)),
-            statements: Vec::new(),
-            parsers: Vec::new(),
-        }
-    }
-
+impl Runtime {
     #[allow(dead_code)]
     pub fn repl(&mut self) {}
 

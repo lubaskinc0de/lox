@@ -1,4 +1,4 @@
-use std::{fmt::Debug, rc::Rc};
+use std::{collections::VecDeque, fmt::Debug, rc::Rc};
 
 use crate::{
     environment::{Environment, RcMutEnv},
@@ -10,7 +10,7 @@ use crate::{
     token::{Literal, RcMutObject},
 };
 
-pub type CallArgs<'a> = Vec<RcMutObject<'a>>;
+pub type CallArgs<'a> = VecDeque<RcMutObject<'a>>;
 pub type CallReturn<'a> = Result<RcMutObject<'a>, InterpreterError>;
 
 pub trait LoxCallable<'a>: Debug {
@@ -26,7 +26,7 @@ pub struct DeclaredFunction<'a> {
 }
 
 impl<'a> LoxCallable<'a> for DeclaredFunction<'a> {
-    fn do_call(&mut self, globals: RcMutEnv<'a>, args: CallArgs<'a>) -> CallReturn<'a> {
+    fn do_call(&mut self, globals: RcMutEnv<'a>, mut args: CallArgs<'a>) -> CallReturn<'a> {
         if args.len() != self.arity() {
             return Err(InterpreterError::Runtime {
                 message: "Not enough arguments".to_string(),
@@ -39,7 +39,7 @@ impl<'a> LoxCallable<'a> for DeclaredFunction<'a> {
 
         for i in 0..self.declaration.params.len() {
             let param = self.declaration.params.get(i).unwrap();
-            env.define(&param, Some(args[i].clone()))?;
+            env.define(&param, args.pop_front())?;
         }
 
         let body = &*self.declaration.body;
